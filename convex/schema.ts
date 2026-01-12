@@ -25,4 +25,30 @@ export default defineSchema({
   })
     .index("by_email", ["email"])
     .index("by_deleted", ["deletedAt"]),
+
+  groups: defineTable({
+    name: v.string(),
+    createdAt: v.number(),
+    createdBy: v.id("users"),
+
+    // Soft delete
+    deletedAt: v.optional(v.number()),
+    deletedBy: v.optional(v.id("users")),
+  })
+    .index("by_deleted", ["deletedAt"])
+    .index("by_creator", ["createdBy"]),
+
+  // Role enum: "admin" | "editor" | "viewer" | "removed"
+  groupMemberships: defineTable({
+    groupId: v.id("groups"),
+    userId: v.id("users"),
+    role: v.string(), // "admin" | "editor" | "viewer" | "removed"
+    joinedAt: v.number(),
+    updatedAt: v.number(),
+    updatedBy: v.id("users"), // Who last changed the role
+  })
+    .index("by_group", ["groupId"])
+    .index("by_user", ["userId"])
+    .index("by_group_user", ["groupId", "userId"])
+    .index("by_group_role", ["groupId", "role"]),
 });
