@@ -1,6 +1,7 @@
 import { useState, FormEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { GoogleOAuthButton } from "./GoogleOAuthButton";
 
 interface LoginFormProps {
   onNeedsTwoFactor?: () => void;
@@ -54,50 +55,68 @@ export function LoginForm({ onNeedsTwoFactor }: LoginFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <div>
-        <label htmlFor="email" style={{ display: "block", marginBottom: "0.25rem" }}>
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoComplete="email"
-          placeholder="you@example.com"
-        />
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <GoogleOAuthButton mode="signin" />
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "1rem",
+          color: "#666",
+          fontSize: "0.875rem",
+        }}
+      >
+        <hr style={{ flex: 1, border: "none", borderTop: "1px solid #ddd" }} />
+        or
+        <hr style={{ flex: 1, border: "none", borderTop: "1px solid #ddd" }} />
       </div>
 
-      <div>
-        <label htmlFor="password" style={{ display: "block", marginBottom: "0.25rem" }}>
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-        />
-      </div>
-
-      {error && (
-        <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>
-          {error}
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div>
+          <label htmlFor="email" style={{ display: "block", marginBottom: "0.25rem" }}>
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            placeholder="you@example.com"
+          />
         </div>
-      )}
 
-      <button type="submit" disabled={isSubmitting} style={{ marginTop: "0.5rem" }}>
-        {isSubmitting ? "Signing in..." : "Sign in"}
-      </button>
+        <div>
+          <label htmlFor="password" style={{ display: "block", marginBottom: "0.25rem" }}>
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem" }}>
-        <Link to="/forgot-password">Forgot password?</Link>
-        <Link to="/register">Create account</Link>
-      </div>
-    </form>
+        {error && (
+          <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>
+            {error}
+          </div>
+        )}
+
+        <button type="submit" disabled={isSubmitting} style={{ marginTop: "0.5rem" }}>
+          {isSubmitting ? "Signing in..." : "Sign in"}
+        </button>
+
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem" }}>
+          <Link to="/forgot-password">Forgot password?</Link>
+          <Link to="/register">Create account</Link>
+        </div>
+      </form>
+    </div>
   );
 }

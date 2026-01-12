@@ -2,6 +2,7 @@ import { useState, FormEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Link } from "@tanstack/react-router";
 import { validatePassword } from "../utils/passwordValidation";
+import { GoogleOAuthButton } from "./GoogleOAuthButton";
 
 export function RegisterForm() {
   const { signIn } = useAuthActions();
@@ -72,72 +73,90 @@ export function RegisterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <div>
-        <label htmlFor="email" style={{ display: "block", marginBottom: "0.25rem" }}>
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoComplete="email"
-          placeholder="you@example.com"
-        />
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <GoogleOAuthButton mode="signup" />
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "1rem",
+          color: "#666",
+          fontSize: "0.875rem",
+        }}
+      >
+        <hr style={{ flex: 1, border: "none", borderTop: "1px solid #ddd" }} />
+        or
+        <hr style={{ flex: 1, border: "none", borderTop: "1px solid #ddd" }} />
       </div>
 
-      <div>
-        <label htmlFor="password" style={{ display: "block", marginBottom: "0.25rem" }}>
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => handlePasswordChange(e.target.value)}
-          required
-          autoComplete="new-password"
-          placeholder="At least 12 characters"
-        />
-        {passwordErrors.length > 0 && (
-          <ul style={{ color: "#dc2626", fontSize: "0.875rem", marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
-            {passwordErrors.map((err, i) => (
-              <li key={i}>{err}</li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div>
-        <label htmlFor="confirmPassword" style={{ display: "block", marginBottom: "0.25rem" }}>
-          Confirm Password
-        </label>
-        <input
-          id="confirmPassword"
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-          autoComplete="new-password"
-          placeholder="Re-enter your password"
-        />
-      </div>
-
-      {error && (
-        <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>
-          {error}
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div>
+          <label htmlFor="email" style={{ display: "block", marginBottom: "0.25rem" }}>
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            placeholder="you@example.com"
+          />
         </div>
-      )}
 
-      <button type="submit" disabled={isSubmitting} style={{ marginTop: "0.5rem" }}>
-        {isSubmitting ? "Creating account..." : "Create account"}
-      </button>
+        <div>
+          <label htmlFor="password" style={{ display: "block", marginBottom: "0.25rem" }}>
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => handlePasswordChange(e.target.value)}
+            required
+            autoComplete="new-password"
+            placeholder="At least 12 characters"
+          />
+          {passwordErrors.length > 0 && (
+            <ul style={{ color: "#dc2626", fontSize: "0.875rem", marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
+              {passwordErrors.map((err, i) => (
+                <li key={i}>{err}</li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-      <p style={{ textAlign: "center", color: "#666", fontSize: "0.875rem" }}>
-        Already have an account? <Link to="/login">Sign in</Link>
-      </p>
-    </form>
+        <div>
+          <label htmlFor="confirmPassword" style={{ display: "block", marginBottom: "0.25rem" }}>
+            Confirm Password
+          </label>
+          <input
+            id="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            autoComplete="new-password"
+            placeholder="Re-enter your password"
+          />
+        </div>
+
+        {error && (
+          <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>
+            {error}
+          </div>
+        )}
+
+        <button type="submit" disabled={isSubmitting} style={{ marginTop: "0.5rem" }}>
+          {isSubmitting ? "Creating account..." : "Create account"}
+        </button>
+
+        <p style={{ textAlign: "center", color: "#666", fontSize: "0.875rem" }}>
+          Already have an account? <Link to="/login">Sign in</Link>
+        </p>
+      </form>
+    </div>
   );
 }
