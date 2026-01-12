@@ -15,6 +15,8 @@
     "@convex-dev/auth": "^0.0.80",
     "@tanstack/react-router": "^1.120.3",
     "convex": "^1.21.0",
+    "otpauth": "^9.4.1",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^5.0.3"
@@ -23,6 +25,7 @@
     "@eslint/js": "^9.17.0",
     "@tanstack/router-devtools": "^1.120.3",
     "@tanstack/router-plugin": "^1.120.3",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
