@@ -1,22 +1,14 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useConvexAuth } from "convex/react";
-import { LoginForm } from "../features/auth";
+import { ResetPasswordForm } from "../features/auth";
 import { Loading } from "../shared/components/Loading";
 
-type LoginSearch = {
-  returnTo?: string;
-};
-
-export const Route = createFileRoute("/login")({
-  component: LoginPage,
-  validateSearch: (search: Record<string, unknown>): LoginSearch => {
-    return {
-      returnTo: typeof search.returnTo === "string" ? search.returnTo : undefined,
-    };
-  },
+export const Route = createFileRoute("/reset-password/$token")({
+  component: ResetPasswordPage,
 });
 
-function LoginPage() {
+function ResetPasswordPage() {
+  const { token } = Route.useParams();
   const { isAuthenticated, isLoading } = useConvexAuth();
 
   if (isLoading) {
@@ -29,8 +21,8 @@ function LoginPage() {
 
   return (
     <div style={{ maxWidth: "400px", margin: "2rem auto", padding: "1rem" }}>
-      <h1 style={{ marginBottom: "1.5rem" }}>Sign in</h1>
-      <LoginForm />
+      <h1 style={{ marginBottom: "1.5rem" }}>Reset password</h1>
+      <ResetPasswordForm token={token} />
     </div>
   );
 }

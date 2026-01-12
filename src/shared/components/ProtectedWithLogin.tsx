@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { useConvexAuth } from "convex/react";
 import { Loading } from "./Loading";
+import { LoginForm } from "../../features/auth";
 
 interface ProtectedWithLoginProps {
   children: ReactNode;
@@ -16,10 +17,8 @@ export function ProtectedWithLogin({ children }: ProtectedWithLoginProps) {
   if (!isAuthenticated) {
     return (
       <div style={{ maxWidth: "400px", margin: "2rem auto", padding: "1rem" }}>
-        <h2>Please log in to continue</h2>
-        <p style={{ marginTop: "1rem", color: "#666" }}>
-          Inline login form will be implemented in Phase 2.
-        </p>
+        <h2 style={{ marginBottom: "1rem" }}>Please log in to continue</h2>
+        <LoginForm />
       </div>
     );
   }
