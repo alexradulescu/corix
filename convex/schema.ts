@@ -75,4 +75,16 @@ export default defineSchema({
     .index("by_group", ["groupId"])
     .index("by_group_created", ["groupId", "createdAt"])
     .index("by_author", ["authorId"]),
+
+  auditLogs: defineTable({
+    groupId: v.id("groups"),
+    actorId: v.id("users"), // Who performed the action
+    targetId: v.optional(v.id("users")), // Affected user (if applicable)
+    action: v.string(), // Action type
+    details: v.optional(v.string()), // JSON string with additional context
+    createdAt: v.number(),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_group_created", ["groupId", "createdAt"])
+    .index("by_actor", ["actorId"]),
 });

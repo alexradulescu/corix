@@ -2,6 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { checkPermission, countAdmins, Role } from "./lib/permissions";
+import { logAudit } from "./auditLogs";
 
 // Change a member's role
 export const changeRole = mutation({
@@ -56,6 +57,19 @@ export const changeRole = mutation({
       updatedBy: actorId,
     });
 
+    // Log audit event
+    const action = newRole === "removed" ? "member_removed" : "role_changed";
+    await logAudit(ctx, {
+      groupId: args.groupId,
+      actorId,
+      targetId: args.userId,
+      action,
+      details: {
+        previousRole: currentRole,
+        newRole: newRole,
+      },
+    });
+
     return { success: true };
   },
 });
@@ -95,11 +109,24 @@ export const leaveGroup = mutation({
       }
     }
 
+    const previousRole = membership.role;
+
     // Set role to removed
     await ctx.db.patch(membership._id, {
       role: "removed",
       updatedAt: Date.now(),
       updatedBy: userId,
+    });
+
+    // Log audit event
+    await logAudit(ctx, {
+      groupId: args.groupId,
+      actorId: userId,
+      targetId: userId,
+      action: "member_left",
+      details: {
+        previousRole,
+      },
     });
 
     return { success: true };

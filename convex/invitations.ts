@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { checkPermission } from "./lib/permissions";
 import { api } from "./_generated/api";
+import { logAudit } from "./auditLogs";
 
 // Create an invitation to a group
 export const createInvitation = mutation({
@@ -73,6 +74,16 @@ export const createInvitation = mutation({
       invitedBy: userId,
       createdAt: Date.now(),
       status: "pending",
+    });
+
+    // Log audit event
+    await logAudit(ctx, {
+      groupId: args.groupId,
+      actorId: userId,
+      action: "member_invited",
+      details: {
+        email,
+      },
     });
 
     // Schedule sending the email
@@ -194,6 +205,18 @@ export const acceptInvitation = mutation({
       acceptedBy: userId,
     });
 
+    // Log audit event
+    await logAudit(ctx, {
+      groupId: invitation.groupId,
+      actorId: userId,
+      targetId: userId,
+      action: "member_joined",
+      details: {
+        role: "viewer",
+        viaInvite: true,
+      },
+    });
+
     return { groupId: invitation.groupId };
   },
 });
@@ -254,6 +277,18 @@ export const autoAcceptInvitations = mutation({
           acceptedAt: Date.now(),
           acceptedBy: userId,
         });
+
+        // Log audit event
+        await logAudit(ctx, {
+          groupId: invitation.groupId,
+          actorId: userId,
+          targetId: userId,
+          action: "member_joined",
+          details: {
+            role: "viewer",
+            viaInvite: true,
+          },
+        });
       }
     }
 
@@ -291,6 +326,16 @@ export const revokeInvitation = mutation({
     // Update invitation status
     await ctx.db.patch(args.invitationId, {
       status: "revoked",
+    });
+
+    // Log audit event
+    await logAudit(ctx, {
+      groupId: invitation.groupId,
+      actorId: userId,
+      action: "invite_revoked",
+      details: {
+        email: invitation.email,
+      },
     });
 
     return { success: true };
