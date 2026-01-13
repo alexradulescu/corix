@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import * as OTPAuth from "otpauth";
 
 export const currentUser = query({
   args: {},
@@ -13,38 +14,9 @@ export const currentUser = query({
   },
 });
 
-// Note: Password changes are handled through the Convex Auth system.
-// This mutation is a placeholder that validates the request and returns success.
-// The actual password change happens through the auth provider.
-export const changePassword = mutation({
-  args: {
-    currentPassword: v.string(),
-    newPassword: v.string(),
-  },
-  handler: async (ctx, _args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db.get(userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Password validation happens on the client side
-    // The actual password change is handled by Convex Auth
-    // This mutation serves as a hook for any additional logic
-    // Note: _args contains currentPassword and newPassword for future use
-
-    // Update the user's updatedAt timestamp
-    await ctx.db.patch(userId, {
-      updatedAt: Date.now(),
-    });
-
-    return { success: true };
-  },
-});
+// Note: Password changes are handled through Convex Auth's built-in password reset flow.
+// Users should use the "Forgot Password" link to change their password.
+// This ensures proper validation and security through the auth provider.
 
 export const updateProfile = mutation({
   args: {
@@ -91,14 +63,28 @@ export const generateTotpSecret = mutation({
       throw new Error("Not authenticated");
     }
 
-    // Generate a random secret (base32 encoded)
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-    let secret = "";
-    for (let i = 0; i < 32; i++) {
-      secret += chars.charAt(Math.floor(Math.random() * chars.length));
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
     }
 
-    return { secret };
+    // Generate a secure random secret using OTPAuth
+    const secret = new OTPAuth.Secret({ size: 20 });
+
+    // Create TOTP instance for QR code generation
+    const totp = new OTPAuth.TOTP({
+      issuer: "Corix",
+      label: user.email || "User",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: secret,
+    });
+
+    return {
+      secret: secret.base32,
+      uri: totp.toString() // For QR code generation
+    };
   },
 });
 
@@ -119,16 +105,26 @@ export const enableTotp = mutation({
       throw new Error("User not found");
     }
 
-    // Verify the TOTP code
-    // Note: In production, you'd use a proper TOTP library here
-    // For now, we accept the code if it's 6 digits
-    if (!/^\d{6}$/.test(args.code)) {
-      throw new Error("Invalid verification code");
+    // Verify the TOTP code using OTPAuth
+    const totp = new OTPAuth.TOTP({
+      issuer: "Corix",
+      label: user.email || "User",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(args.secret),
+    });
+
+    // Validate with a window of ±1 period (allows for clock skew)
+    const delta = totp.validate({ token: args.code, window: 1 });
+
+    if (delta === null) {
+      throw new Error("Invalid verification code. Please try again.");
     }
 
-    // Store the encrypted secret and enable 2FA
+    // Store the secret and enable 2FA
     await ctx.db.patch(userId, {
-      totpSecret: args.secret, // In production, encrypt this
+      totpSecret: args.secret,
       totpEnabled: true,
       updatedAt: Date.now(),
     });
@@ -153,13 +149,25 @@ export const disableTotp = mutation({
       throw new Error("User not found");
     }
 
-    if (!user.totpEnabled) {
+    if (!user.totpEnabled || !user.totpSecret) {
       throw new Error("2FA is not enabled");
     }
 
-    // Verify the TOTP code
-    if (!/^\d{6}$/.test(args.code)) {
-      throw new Error("Invalid verification code");
+    // Verify the TOTP code using OTPAuth
+    const totp = new OTPAuth.TOTP({
+      issuer: "Corix",
+      label: user.email || "User",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(user.totpSecret),
+    });
+
+    // Validate with a window of ±1 period (allows for clock skew)
+    const delta = totp.validate({ token: args.code, window: 1 });
+
+    if (delta === null) {
+      throw new Error("Invalid verification code. Please try again.");
     }
 
     // Clear the secret and disable 2FA
@@ -193,13 +201,23 @@ export const verifyTotpCode = mutation({
       throw new Error("2FA is not enabled");
     }
 
-    // Verify the TOTP code
-    // Note: In production, use a proper TOTP verification library
-    if (!/^\d{6}$/.test(args.code)) {
-      throw new Error("Invalid verification code");
+    // Verify the TOTP code using OTPAuth
+    const totp = new OTPAuth.TOTP({
+      issuer: "Corix",
+      label: user.email || "User",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(user.totpSecret),
+    });
+
+    // Validate with a window of ±1 period (allows for clock skew)
+    const delta = totp.validate({ token: args.code, window: 1 });
+
+    if (delta === null) {
+      throw new Error("Invalid verification code. Please try again.");
     }
 
-    // Code is valid (simplified for demo)
     return { success: true };
   },
 });

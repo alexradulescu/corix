@@ -1,10 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, FormEvent } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Loading } from "../../shared/components/Loading";
-import { PasswordConfirmDialog } from "../../shared/components/PasswordConfirmDialog";
-import { validatePassword } from "../../features/auth/utils/passwordValidation";
 import { TotpSetup } from "../../features/auth/components/TotpSetup";
 
 export const Route = createFileRoute("/settings/security")({
@@ -13,16 +11,11 @@ export const Route = createFileRoute("/settings/security")({
 
 function SettingsSecurityPage() {
   const user = useQuery(api.users.currentUser);
-  const changePassword = useMutation(api.users.changePassword);
   const disableTotp = useMutation(api.users.disableTotp);
 
-  const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [showTotpSetup, setShowTotpSetup] = useState(false);
   const [showDisableTotp, setShowDisableTotp] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [disableTotpCode, setDisableTotpCode] = useState("");
-  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [totpError, setTotpError] = useState<string | null>(null);
 
@@ -33,40 +26,6 @@ function SettingsSecurityPage() {
   if (user === null) {
     return <div>Not authenticated</div>;
   }
-
-  const handleNewPasswordChange = (value: string) => {
-    setNewPassword(value);
-    if (value) {
-      const { errors } = validatePassword(value);
-      setPasswordErrors(errors);
-    } else {
-      setPasswordErrors([]);
-    }
-  };
-
-  const handlePasswordChangeConfirm = async (currentPassword: string) => {
-    // Validate new password
-    const { valid, errors } = validatePassword(newPassword);
-    if (!valid) {
-      throw new Error(errors[0]);
-    }
-
-    // Check passwords match
-    if (newPassword !== confirmNewPassword) {
-      throw new Error("New passwords do not match");
-    }
-
-    await changePassword({
-      currentPassword,
-      newPassword,
-    });
-
-    setNewPassword("");
-    setConfirmNewPassword("");
-    setPasswordErrors([]);
-    setSuccessMessage("Password changed successfully");
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
 
   const handleDisableTotp = async (e: FormEvent) => {
     e.preventDefault();
@@ -105,70 +64,25 @@ function SettingsSecurityPage() {
         {/* Password Change Section */}
         <section>
           <h3 style={{ marginBottom: "1rem" }}>Change Password</h3>
-
-          <form
-            onSubmit={(e: FormEvent) => {
-              e.preventDefault();
-              const { valid } = validatePassword(newPassword);
-              if (!valid) return;
-              if (newPassword !== confirmNewPassword) {
-                setPasswordErrors(["Passwords do not match"]);
-                return;
-              }
-              setShowPasswordChange(true);
-            }}
-            style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: "400px" }}
-          >
-            <div>
-              <label htmlFor="new-password" style={{ display: "block", marginBottom: "0.25rem" }}>
-                New Password
-              </label>
-              <input
-                id="new-password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => handleNewPasswordChange(e.target.value)}
-                autoComplete="new-password"
-                placeholder="At least 12 characters"
-              />
-              {passwordErrors.length > 0 && (
-                <ul
-                  style={{
-                    color: "#dc2626",
-                    fontSize: "0.875rem",
-                    marginTop: "0.5rem",
-                    paddingLeft: "1.25rem",
-                  }}
-                >
-                  {passwordErrors.map((err, i) => (
-                    <li key={i}>{err}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="confirm-new-password" style={{ display: "block", marginBottom: "0.25rem" }}>
-                Confirm New Password
-              </label>
-              <input
-                id="confirm-new-password"
-                type="password"
-                value={confirmNewPassword}
-                onChange={(e) => setConfirmNewPassword(e.target.value)}
-                autoComplete="new-password"
-                placeholder="Re-enter new password"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={!newPassword || !confirmNewPassword || passwordErrors.length > 0}
-              style={{ alignSelf: "flex-start" }}
+          <div style={{ padding: "1rem", backgroundColor: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px" }}>
+            <p style={{ fontSize: "0.875rem", color: "#666", marginBottom: "1rem" }}>
+              To change your password, please use the password reset flow for security reasons.
+            </p>
+            <Link
+              to="/forgot-password"
+              style={{
+                display: "inline-block",
+                padding: "0.5rem 1rem",
+                backgroundColor: "#007bff",
+                color: "white",
+                textDecoration: "none",
+                borderRadius: "4px",
+                fontSize: "0.875rem",
+              }}
             >
-              Change Password
-            </button>
-          </form>
+              Reset Password
+            </Link>
+          </div>
         </section>
 
         {/* 2FA Section */}
@@ -270,14 +184,6 @@ function SettingsSecurityPage() {
           )}
         </section>
       </div>
-
-      <PasswordConfirmDialog
-        isOpen={showPasswordChange}
-        onClose={() => setShowPasswordChange(false)}
-        onConfirm={handlePasswordChangeConfirm}
-        title="Confirm password change"
-        description="Enter your current password to confirm the password change."
-      />
     </div>
   );
 }
