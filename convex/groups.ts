@@ -365,3 +365,115 @@ export const restoreGroup = mutation({
     return { success: true };
   },
 });
+
+// Get all groups in the system (super-admin only)
+export const getAllGroups = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return [];
+    }
+
+    // Check if user is a super-admin
+    const user = await ctx.db.get(userId);
+    if (!user || !user.isSuperAdmin) {
+      return [];
+    }
+
+    // Get all groups including soft-deleted ones
+    const groups = await ctx.db.query("groups").collect();
+
+    // Enrich with membership count and creator info
+    const enrichedGroups = await Promise.all(
+      groups.map(async (group) => {
+        const memberships = await ctx.db
+          .query("groupMemberships")
+          .withIndex("by_group", (q) => q.eq("groupId", group._id))
+          .collect();
+
+        const creator = await ctx.db.get(group.createdBy);
+
+        return {
+          ...group,
+          memberCount: memberships.length,
+          activeMembers: memberships.filter((m) => m.role !== "removed").length,
+          creatorEmail: creator?.email || creator?.deletedUserId || "Unknown",
+        };
+      })
+    );
+
+    // Sort: active groups first, then by name
+    return enrichedGroups.sort((a, b) => {
+      if (a.deletedAt && !b.deletedAt) return 1;
+      if (!a.deletedAt && b.deletedAt) return -1;
+      return a.name.localeCompare(b.name);
+    });
+  },
+});
+
+// Hard delete a group (super-admin only)
+export const hardDeleteGroup = mutation({
+  args: {
+    groupId: v.id("groups"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    // Check if user is a super-admin
+    const user = await ctx.db.get(userId);
+    if (!user || !user.isSuperAdmin) {
+      throw new Error("Only super-admins can hard delete groups");
+    }
+
+    const group = await ctx.db.get(args.groupId);
+    if (!group) {
+      throw new Error("Group not found");
+    }
+
+    // Delete all related data
+    // 1. Delete all messages
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_group", (q) => q.eq("groupId", args.groupId))
+      .collect();
+    for (const message of messages) {
+      await ctx.db.delete(message._id);
+    }
+
+    // 2. Delete all invitations
+    const invitations = await ctx.db
+      .query("invitations")
+      .withIndex("by_group", (q) => q.eq("groupId", args.groupId))
+      .collect();
+    for (const invitation of invitations) {
+      await ctx.db.delete(invitation._id);
+    }
+
+    // 3. Delete all memberships
+    const memberships = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_group", (q) => q.eq("groupId", args.groupId))
+      .collect();
+    for (const membership of memberships) {
+      await ctx.db.delete(membership._id);
+    }
+
+    // 4. Delete all audit logs
+    const auditLogs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_group", (q) => q.eq("groupId", args.groupId))
+      .collect();
+    for (const auditLog of auditLogs) {
+      await ctx.db.delete(auditLog._id);
+    }
+
+    // 5. Delete the group itself
+    await ctx.db.delete(args.groupId);
+
+    return { success: true };
+  },
+});

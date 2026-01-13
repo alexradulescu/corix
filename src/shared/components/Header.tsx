@@ -1,10 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { useConvexAuth } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { api } from "../../convex/_generated/api";
 
 export function Header() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { signOut } = useAuthActions();
+  const currentUser = useQuery(api.users.currentUser);
 
   return (
     <header
@@ -27,6 +29,21 @@ export function Header() {
         {isLoading ? null : isAuthenticated ? (
           <>
             <Link to="/groups">My Groups</Link>
+            {currentUser?.isSuperAdmin && (
+              <Link
+                to="/admin/groups"
+                style={{
+                  backgroundColor: "#ffc107",
+                  color: "#000",
+                  padding: "0.4em 0.8em",
+                  borderRadius: "4px",
+                  textDecoration: "none",
+                  fontWeight: "bold",
+                }}
+              >
+                Admin
+              </Link>
+            )}
             <Link to="/settings">Settings</Link>
             <button
               onClick={() => void signOut()}
