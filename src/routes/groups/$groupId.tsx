@@ -31,6 +31,7 @@ function GroupLayout() {
   }
 
   const isRemoved = group.membership.role === "removed";
+  const isDeleted = !!group.deletedAt;
 
   return (
     <div style={{ maxWidth: "900px", margin: "2rem auto", padding: "1rem" }}>
@@ -54,6 +55,21 @@ function GroupLayout() {
           {group.membership.role}
         </span>
       </div>
+
+      {isDeleted && (
+        <div
+          style={{
+            padding: "1rem",
+            backgroundColor: "#fee",
+            border: "1px solid #dc2626",
+            borderRadius: "8px",
+            marginBottom: "1.5rem",
+            color: "#dc2626",
+          }}
+        >
+          <strong>⚠ This group has been soft deleted.</strong> It is archived and all members have been removed. Only super-admins can restore this group.
+        </div>
+      )}
 
       {isRemoved ? (
         <div style={{ padding: "2rem", backgroundColor: "#f5f5f5", borderRadius: "8px", textAlign: "center" }}>

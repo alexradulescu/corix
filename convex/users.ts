@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import * as OTPAuth from "otpauth";
 
 export const currentUser = query({
   args: {},
@@ -13,38 +14,9 @@ export const currentUser = query({
   },
 });
 
-// Note: Password changes are handled through the Convex Auth system.
-// This mutation is a placeholder that validates the request and returns success.
-// The actual password change happens through the auth provider.
-export const changePassword = mutation({
-  args: {
-    currentPassword: v.string(),
-    newPassword: v.string(),
-  },
-  handler: async (ctx, _args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db.get(userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Password validation happens on the client side
-    // The actual password change is handled by Convex Auth
-    // This mutation serves as a hook for any additional logic
-    // Note: _args contains currentPassword and newPassword for future use
-
-    // Update the user's updatedAt timestamp
-    await ctx.db.patch(userId, {
-      updatedAt: Date.now(),
-    });
-
-    return { success: true };
-  },
-});
+// Note: Password changes are handled through Convex Auth's built-in password reset flow.
+// Users should use the "Forgot Password" link to change their password.
+// This ensures proper validation and security through the auth provider.
 
 export const updateProfile = mutation({
   args: {
@@ -91,14 +63,28 @@ export const generateTotpSecret = mutation({
       throw new Error("Not authenticated");
     }
 
-    // Generate a random secret (base32 encoded)
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-    let secret = "";
-    for (let i = 0; i < 32; i++) {
-      secret += chars.charAt(Math.floor(Math.random() * chars.length));
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
     }
 
-    return { secret };
+    // Generate a secure random secret using OTPAuth
+    const secret = new OTPAuth.Secret({ size: 20 });
+
+    // Create TOTP instance for QR code generation
+    const totp = new OTPAuth.TOTP({
+      issuer: "Corix",
+      label: user.email || "User",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: secret,
+    });
+
+    return {
+      secret: secret.base32,
+      uri: totp.toString() // For QR code generation
+    };
   },
 });
 
@@ -119,16 +105,26 @@ export const enableTotp = mutation({
       throw new Error("User not found");
     }
 
-    // Verify the TOTP code
-    // Note: In production, you'd use a proper TOTP library here
-    // For now, we accept the code if it's 6 digits
-    if (!/^\d{6}$/.test(args.code)) {
-      throw new Error("Invalid verification code");
+    // Verify the TOTP code using OTPAuth
+    const totp = new OTPAuth.TOTP({
+      issuer: "Corix",
+      label: user.email || "User",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(args.secret),
+    });
+
+    // Validate with a window of ±1 period (allows for clock skew)
+    const delta = totp.validate({ token: args.code, window: 1 });
+
+    if (delta === null) {
+      throw new Error("Invalid verification code. Please try again.");
     }
 
-    // Store the encrypted secret and enable 2FA
+    // Store the secret and enable 2FA
     await ctx.db.patch(userId, {
-      totpSecret: args.secret, // In production, encrypt this
+      totpSecret: args.secret,
       totpEnabled: true,
       updatedAt: Date.now(),
     });
@@ -153,13 +149,25 @@ export const disableTotp = mutation({
       throw new Error("User not found");
     }
 
-    if (!user.totpEnabled) {
+    if (!user.totpEnabled || !user.totpSecret) {
       throw new Error("2FA is not enabled");
     }
 
-    // Verify the TOTP code
-    if (!/^\d{6}$/.test(args.code)) {
-      throw new Error("Invalid verification code");
+    // Verify the TOTP code using OTPAuth
+    const totp = new OTPAuth.TOTP({
+      issuer: "Corix",
+      label: user.email || "User",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(user.totpSecret),
+    });
+
+    // Validate with a window of ±1 period (allows for clock skew)
+    const delta = totp.validate({ token: args.code, window: 1 });
+
+    if (delta === null) {
+      throw new Error("Invalid verification code. Please try again.");
     }
 
     // Clear the secret and disable 2FA
@@ -193,13 +201,253 @@ export const verifyTotpCode = mutation({
       throw new Error("2FA is not enabled");
     }
 
-    // Verify the TOTP code
-    // Note: In production, use a proper TOTP verification library
-    if (!/^\d{6}$/.test(args.code)) {
-      throw new Error("Invalid verification code");
+    // Verify the TOTP code using OTPAuth
+    const totp = new OTPAuth.TOTP({
+      issuer: "Corix",
+      label: user.email || "User",
+      algorithm: "SHA1",
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(user.totpSecret),
+    });
+
+    // Validate with a window of ±1 period (allows for clock skew)
+    const delta = totp.validate({ token: args.code, window: 1 });
+
+    if (delta === null) {
+      throw new Error("Invalid verification code. Please try again.");
     }
 
-    // Code is valid (simplified for demo)
+    return { success: true };
+  },
+});
+
+// Check if user can delete their account
+export const canDeleteAccount = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return { canDelete: false, reason: "Not authenticated" };
+    }
+
+    // Get all memberships where user is admin
+    const memberships = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("role"), "admin"))
+      .collect();
+
+    // For each admin membership, check if user is the sole admin
+    const soleAdminGroups: string[] = [];
+
+    for (const membership of memberships) {
+      const group = await ctx.db.get(membership.groupId);
+      if (!group) continue;
+
+      // Count admins in this group
+      const adminCount = await ctx.db
+        .query("groupMemberships")
+        .withIndex("by_group_role", (q) =>
+          q.eq("groupId", membership.groupId).eq("role", "admin")
+        )
+        .collect();
+
+      if (adminCount.length === 1) {
+        // User is sole admin
+        soleAdminGroups.push(group.name);
+      }
+    }
+
+    if (soleAdminGroups.length > 0) {
+      return {
+        canDelete: false,
+        reason: `You are the sole admin of: ${soleAdminGroups.join(", ")}. Promote another member to admin or leave these groups first.`,
+        soleAdminGroups,
+      };
+    }
+
+    return { canDelete: true, reason: null, soleAdminGroups: [] };
+  },
+});
+
+// Soft delete user account
+export const deleteAccount = mutation({
+  args: {
+    confirmPassword: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.deletedAt) {
+      throw new Error("Account is already deleted");
+    }
+
+    // Check if user can delete (not sole admin of any groups)
+    const memberships = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("role"), "admin"))
+      .collect();
+
+    for (const membership of memberships) {
+      const adminCount = await ctx.db
+        .query("groupMemberships")
+        .withIndex("by_group_role", (q) =>
+          q.eq("groupId", membership.groupId).eq("role", "admin")
+        )
+        .collect();
+
+      if (adminCount.length === 1) {
+        throw new Error("You must not be the sole admin of any group");
+      }
+    }
+
+    // Check if user has left all groups (all memberships should be "removed")
+    const activeMemberships = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.neq(q.field("role"), "removed"))
+      .collect();
+
+    if (activeMemberships.length > 0) {
+      throw new Error("You must leave all groups before deleting your account");
+    }
+
+    // Generate a unique ID for the deleted user
+    const uniqueId = Math.random().toString(36).substring(2, 9).toUpperCase();
+    const deletedUserId = `Deleted User ${uniqueId}`;
+
+    // Soft delete the user
+    await ctx.db.patch(userId, {
+      deletedAt: Date.now(),
+      deletedUserId,
+      email: undefined, // Remove PII
+      totpSecret: undefined, // Remove 2FA secret
+      totpEnabled: false,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Get all users in the system (super-admin only)
+export const getAllUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return [];
+    }
+
+    // Check if user is a super-admin
+    const user = await ctx.db.get(userId);
+    if (!user || !user.isSuperAdmin) {
+      return [];
+    }
+
+    // Get all users including soft-deleted ones
+    const users = await ctx.db.query("users").collect();
+
+    // Enrich with membership and group count
+    const enrichedUsers = await Promise.all(
+      users.map(async (user) => {
+        const memberships = await ctx.db
+          .query("groupMemberships")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect();
+
+        const activeMemberships = memberships.filter((m) => m.role !== "removed");
+        const adminMemberships = memberships.filter((m) => m.role === "admin");
+
+        return {
+          ...user,
+          membershipCount: memberships.length,
+          activeMemberships: activeMemberships.length,
+          adminOfGroups: adminMemberships.length,
+        };
+      })
+    );
+
+    // Sort: active users first, then by creation date
+    return enrichedUsers.sort((a, b) => {
+      if (a.deletedAt && !b.deletedAt) return 1;
+      if (!a.deletedAt && b.deletedAt) return -1;
+      return (b.creationTime || 0) - (a.creationTime || 0);
+    });
+  },
+});
+
+// Hard delete a user (super-admin only)
+export const hardDeleteUser = mutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const adminId = await getAuthUserId(ctx);
+    if (!adminId) {
+      throw new Error("Not authenticated");
+    }
+
+    // Check if admin is a super-admin
+    const admin = await ctx.db.get(adminId);
+    if (!admin || !admin.isSuperAdmin) {
+      throw new Error("Only super-admins can hard delete users");
+    }
+
+    // Can't delete yourself
+    if (args.userId === adminId) {
+      throw new Error("You cannot delete your own account");
+    }
+
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Delete all related data
+    // 1. Delete all memberships
+    const memberships = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    for (const membership of memberships) {
+      await ctx.db.delete(membership._id);
+    }
+
+    // 2. Delete all invitations created by this user
+    const invitations = await ctx.db
+      .query("invitations")
+      .filter((q) => q.eq(q.field("invitedBy"), args.userId))
+      .collect();
+    for (const invitation of invitations) {
+      await ctx.db.delete(invitation._id);
+    }
+
+    // 3. Delete all audit logs where user is the actor
+    const auditLogs = await ctx.db
+      .query("auditLogs")
+      .withIndex("by_actor", (q) => q.eq("actorId", args.userId))
+      .collect();
+    for (const auditLog of auditLogs) {
+      await ctx.db.delete(auditLog._id);
+    }
+
+    // 4. Keep messages but they'll show as deleted user via deletedUserId
+    // Messages are preserved for historical context
+
+    // 5. Delete the user itself
+    await ctx.db.delete(args.userId);
+
     return { success: true };
   },
 });

@@ -51,4 +51,40 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_group_user", ["groupId", "userId"])
     .index("by_group_role", ["groupId", "role"]),
+
+  invitations: defineTable({
+    groupId: v.id("groups"),
+    email: v.string(), // Invitee email (may or may not be registered)
+    invitedBy: v.id("users"),
+    createdAt: v.number(),
+    status: v.string(), // "pending" | "accepted" | "revoked"
+    acceptedAt: v.optional(v.number()),
+    acceptedBy: v.optional(v.id("users")),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_email", ["email"])
+    .index("by_group_email", ["groupId", "email"])
+    .index("by_status", ["status"]),
+
+  messages: defineTable({
+    groupId: v.id("groups"),
+    authorId: v.id("users"),
+    content: v.string(), // Max 500 characters, plain text
+    createdAt: v.number(),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_group_created", ["groupId", "createdAt"])
+    .index("by_author", ["authorId"]),
+
+  auditLogs: defineTable({
+    groupId: v.id("groups"),
+    actorId: v.id("users"), // Who performed the action
+    targetId: v.optional(v.id("users")), // Affected user (if applicable)
+    action: v.string(), // Action type
+    details: v.optional(v.string()), // JSON string with additional context
+    createdAt: v.number(),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_group_created", ["groupId", "createdAt"])
+    .index("by_actor", ["actorId"]),
 });
