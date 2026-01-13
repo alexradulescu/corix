@@ -134,3 +134,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Convex generated files
+convex/_generated/
+
+# TanStack Router generated files
+src/routeTree.gen.ts
