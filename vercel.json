@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "vite",
+  "env": {
+    "VITE_CONVEX_URL": {
+      "description": "Convex deployment URL (get from Convex dashboard)",
+      "required": true
+    }
+  }
+}
