@@ -51,4 +51,18 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_group_user", ["groupId", "userId"])
     .index("by_group_role", ["groupId", "role"]),
+
+  invitations: defineTable({
+    groupId: v.id("groups"),
+    email: v.string(), // Invitee email (may or may not be registered)
+    invitedBy: v.id("users"),
+    createdAt: v.number(),
+    status: v.string(), // "pending" | "accepted" | "revoked"
+    acceptedAt: v.optional(v.number()),
+    acceptedBy: v.optional(v.id("users")),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_email", ["email"])
+    .index("by_group_email", ["groupId", "email"])
+    .index("by_status", ["status"]),
 });

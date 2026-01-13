@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { Loading } from "../shared/components/Loading";
 
 export const Route = createFileRoute("/verify-email/$token")({
@@ -10,6 +12,9 @@ export const Route = createFileRoute("/verify-email/$token")({
 function VerifyEmailPage() {
   const { token } = Route.useParams();
   const { signIn } = useAuthActions();
+  const autoAcceptInvitations = useMutation(api.invitations.autoAcceptInvitations);
+  const currentUser = useQuery(api.users.currentUser);
+
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying");
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +38,22 @@ function VerifyEmailPage() {
 
     verify();
   }, [token, signIn]);
+
+  // Auto-accept pending invitations after verification
+  useEffect(() => {
+    async function acceptInvitations() {
+      if (status === "success" && currentUser?.email) {
+        try {
+          await autoAcceptInvitations({ email: currentUser.email });
+        } catch (err) {
+          console.error("Failed to auto-accept invitations:", err);
+          // Don't show error to user, just log it
+        }
+      }
+    }
+
+    acceptInvitations();
+  }, [status, currentUser, autoAcceptInvitations]);
 
   if (status === "verifying") {
     return (
