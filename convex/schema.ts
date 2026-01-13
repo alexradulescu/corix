@@ -65,4 +65,14 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_group_email", ["groupId", "email"])
     .index("by_status", ["status"]),
+
+  messages: defineTable({
+    groupId: v.id("groups"),
+    authorId: v.id("users"),
+    content: v.string(), // Max 500 characters, plain text
+    createdAt: v.number(),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_group_created", ["groupId", "createdAt"])
+    .index("by_author", ["authorId"]),
 });
