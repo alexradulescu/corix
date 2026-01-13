@@ -203,3 +203,121 @@ export const verifyTotpCode = mutation({
     return { success: true };
   },
 });
+
+// Check if user can delete their account
+export const canDeleteAccount = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return { canDelete: false, reason: "Not authenticated" };
+    }
+
+    // Get all memberships where user is admin
+    const memberships = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("role"), "admin"))
+      .collect();
+
+    // For each admin membership, check if user is the sole admin
+    const soleAdminGroups: string[] = [];
+
+    for (const membership of memberships) {
+      const group = await ctx.db.get(membership.groupId);
+      if (!group) continue;
+
+      // Count admins in this group
+      const adminCount = await ctx.db
+        .query("groupMemberships")
+        .withIndex("by_group_role", (q) =>
+          q.eq("groupId", membership.groupId).eq("role", "admin")
+        )
+        .collect();
+
+      if (adminCount.length === 1) {
+        // User is sole admin
+        soleAdminGroups.push(group.name);
+      }
+    }
+
+    if (soleAdminGroups.length > 0) {
+      return {
+        canDelete: false,
+        reason: `You are the sole admin of: ${soleAdminGroups.join(", ")}. Promote another member to admin or leave these groups first.`,
+        soleAdminGroups,
+      };
+    }
+
+    return { canDelete: true, reason: null, soleAdminGroups: [] };
+  },
+});
+
+// Soft delete user account
+export const deleteAccount = mutation({
+  args: {
+    confirmPassword: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (user.deletedAt) {
+      throw new Error("Account is already deleted");
+    }
+
+    // Check if user can delete (not sole admin of any groups)
+    const memberships = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("role"), "admin"))
+      .collect();
+
+    for (const membership of memberships) {
+      const adminCount = await ctx.db
+        .query("groupMemberships")
+        .withIndex("by_group_role", (q) =>
+          q.eq("groupId", membership.groupId).eq("role", "admin")
+        )
+        .collect();
+
+      if (adminCount.length === 1) {
+        throw new Error("You must not be the sole admin of any group");
+      }
+    }
+
+    // Check if user has left all groups (all memberships should be "removed")
+    const activeMemberships = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.neq(q.field("role"), "removed"))
+      .collect();
+
+    if (activeMemberships.length > 0) {
+      throw new Error("You must leave all groups before deleting your account");
+    }
+
+    // Generate a unique ID for the deleted user
+    const uniqueId = Math.random().toString(36).substring(2, 9).toUpperCase();
+    const deletedUserId = `Deleted User ${uniqueId}`;
+
+    // Soft delete the user
+    await ctx.db.patch(userId, {
+      deletedAt: Date.now(),
+      deletedUserId,
+      email: undefined, // Remove PII
+      totpSecret: undefined, // Remove 2FA secret
+      totpEnabled: false,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
