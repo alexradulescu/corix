@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { useState } from "react";
+import { Loading } from "../../shared/components/Loading";
 import styles from "./groups.module.css";
 
 export const Route = createFileRoute("/admin/groups")({
@@ -19,37 +20,53 @@ function AdminGroupsPage() {
   const [selectedAdminId, setSelectedAdminId] = useState<Id<"users"> | null>(null);
   const [deletingGroupId, setDeletingGroupId] = useState<Id<"groups"> | null>(null);
   const [confirmText, setConfirmText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleRestore = async (groupId: Id<"groups">) => {
     if (!selectedAdminId) {
-      alert("Please select an admin for the restored group");
+      setError("Please select an admin for the restored group");
       return;
     }
+
+    setIsSubmitting(true);
+    setError(null);
+
     try {
       await restoreGroup({ groupId, newAdminId: selectedAdminId });
       setRestoringGroupId(null);
       setSelectedAdminId(null);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to restore group");
+      const errorMessage = error instanceof Error ? error.message : "Failed to restore group";
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleHardDelete = async (groupId: Id<"groups">, groupName: string) => {
     if (confirmText !== groupName) {
-      alert("Group name doesn't match");
+      setError("Group name doesn't match");
       return;
     }
+
+    setIsSubmitting(true);
+    setError(null);
+
     try {
       await hardDeleteGroup({ groupId });
       setDeletingGroupId(null);
       setConfirmText("");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete group");
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete group";
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   if (groups === undefined || allUsers === undefined) {
-    return <div>Loading...</div>;
+    return <Loading />;
   }
 
   const activeGroups = groups.filter((g) => !g.deletedAt);
@@ -160,10 +177,28 @@ function AdminGroupsPage() {
           <div className={styles.modalContent}>
             <h3>Restore Group</h3>
             <p>Select a new admin for the restored group:</p>
+
+            {error && (
+              <div
+                style={{
+                  padding: "0.75rem",
+                  marginBottom: "1rem",
+                  backgroundColor: "#fee",
+                  color: "#dc2626",
+                  fontSize: "0.875rem",
+                  borderRadius: "4px",
+                  border: "1px solid #dc2626",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
             <select
               value={selectedAdminId || ""}
               onChange={(e) => setSelectedAdminId(e.target.value as Id<"users">)}
               className={styles.select}
+              disabled={isSubmitting}
             >
               <option value="">Select a user...</option>
               {allUsers
@@ -177,16 +212,18 @@ function AdminGroupsPage() {
             <div className={styles.modalActions}>
               <button
                 onClick={() => handleRestore(restoringGroupId)}
-                disabled={!selectedAdminId}
+                disabled={!selectedAdminId || isSubmitting}
                 className={styles.primaryButton}
               >
-                Restore
+                {isSubmitting ? "Restoring..." : "Restore"}
               </button>
               <button
                 onClick={() => {
                   setRestoringGroupId(null);
                   setSelectedAdminId(null);
+                  setError(null);
                 }}
+                disabled={isSubmitting}
                 className={styles.secondaryButton}
               >
                 Cancel
@@ -212,12 +249,30 @@ function AdminGroupsPage() {
                 {groups.find((g) => g._id === deletingGroupId)?.name}
               </strong>
             </p>
+
+            {error && (
+              <div
+                style={{
+                  padding: "0.75rem",
+                  marginBottom: "1rem",
+                  backgroundColor: "#fee",
+                  color: "#dc2626",
+                  fontSize: "0.875rem",
+                  borderRadius: "4px",
+                  border: "1px solid #dc2626",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
             <input
               type="text"
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder="Group name"
               className={styles.input}
+              disabled={isSubmitting}
             />
             <div className={styles.modalActions}>
               <button
@@ -229,17 +284,20 @@ function AdminGroupsPage() {
                 }}
                 disabled={
                   confirmText !==
-                  groups.find((g) => g._id === deletingGroupId)?.name
+                  groups.find((g) => g._id === deletingGroupId)?.name ||
+                  isSubmitting
                 }
                 className={styles.dangerButton}
               >
-                Hard Delete
+                {isSubmitting ? "Deleting..." : "Hard Delete"}
               </button>
               <button
                 onClick={() => {
                   setDeletingGroupId(null);
                   setConfirmText("");
+                  setError(null);
                 }}
+                disabled={isSubmitting}
                 className={styles.secondaryButton}
               >
                 Cancel

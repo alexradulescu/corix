@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { useState } from "react";
+import { Loading } from "../../shared/components/Loading";
 import styles from "./users.module.css";
 
 export const Route = createFileRoute("/admin/users")({
@@ -15,23 +16,32 @@ function AdminUsersPage() {
 
   const [deletingUserId, setDeletingUserId] = useState<Id<"users"> | null>(null);
   const [confirmText, setConfirmText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleHardDelete = async (userId: Id<"users">, userEmail: string) => {
     if (confirmText !== "DELETE") {
-      alert("Please type DELETE to confirm");
+      setError("Please type DELETE to confirm");
       return;
     }
+
+    setIsDeleting(true);
+    setError(null);
+
     try {
       await hardDeleteUser({ userId });
       setDeletingUserId(null);
       setConfirmText("");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Failed to delete user");
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete user";
+      setError(errorMessage);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   if (users === undefined) {
-    return <div>Loading...</div>;
+    return <Loading />;
   }
 
   const activeUsers = users.filter((u) => !u.deletedAt);
@@ -162,6 +172,23 @@ function AdminUsersPage() {
                   "Unknown"}
               </strong>
             </p>
+
+            {error && (
+              <div
+                style={{
+                  padding: "0.75rem",
+                  marginBottom: "1rem",
+                  backgroundColor: "#fee",
+                  color: "#dc2626",
+                  fontSize: "0.875rem",
+                  borderRadius: "4px",
+                  border: "1px solid #dc2626",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
             <p>Type DELETE to confirm:</p>
             <input
               type="text"
@@ -169,6 +196,7 @@ function AdminUsersPage() {
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder="DELETE"
               className={styles.input}
+              disabled={isDeleting}
             />
             <div className={styles.modalActions}>
               <button
@@ -181,16 +209,18 @@ function AdminUsersPage() {
                     );
                   }
                 }}
-                disabled={confirmText !== "DELETE"}
+                disabled={confirmText !== "DELETE" || isDeleting}
                 className={styles.dangerButton}
               >
-                Hard Delete
+                {isDeleting ? "Deleting..." : "Hard Delete"}
               </button>
               <button
                 onClick={() => {
                   setDeletingUserId(null);
                   setConfirmText("");
+                  setError(null);
                 }}
+                disabled={isDeleting}
                 className={styles.secondaryButton}
               >
                 Cancel

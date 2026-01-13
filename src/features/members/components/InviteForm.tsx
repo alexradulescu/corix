@@ -2,6 +2,7 @@ import { useState, FormEvent } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { validateEmail } from "../../../shared/utils/validation";
 
 interface InviteFormProps {
   groupId: Id<"groups">;
@@ -21,17 +22,14 @@ export function InviteForm({ groupId, onSuccess }: InviteFormProps) {
     setError(null);
     setSuccess(null);
 
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail) {
-      setError("Email is required");
+    // Validate email
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setError(emailError);
       return;
     }
 
-    // Basic email validation
-    if (!trimmedEmail.includes("@") || !trimmedEmail.includes(".")) {
-      setError("Please enter a valid email address");
-      return;
-    }
+    const trimmedEmail = email.trim().toLowerCase();
 
     setIsSubmitting(true);
 

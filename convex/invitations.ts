@@ -105,11 +105,40 @@ export const sendInvitationEmail = action({
     groupName: v.string(),
   },
   handler: async (ctx, args) => {
-    // For now, we'll just log the email
-    // In production, you would use Resend here
+    const inviteUrl = `${process.env.SITE_URL || "http://localhost:5173"}/invite/${args.invitationId}`;
+
+    // Try to send email via Resend if configured
+    if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith("re_")) {
+      try {
+        const { Resend } = await import("resend");
+        const resend = new Resend(process.env.RESEND_API_KEY);
+
+        await resend.emails.send({
+          from: process.env.FROM_EMAIL || "onboarding@resend.dev",
+          to: args.email,
+          subject: `You're invited to join ${args.groupName}`,
+          html: `
+            <h2>You've been invited to join ${args.groupName}</h2>
+            <p>You've been invited to join the group "${args.groupName}" on Corix.</p>
+            <p><a href="${inviteUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Accept Invitation</a></p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p>${inviteUrl}</p>
+            <p>If you don't have an account yet, you'll be able to create one when you accept the invitation.</p>
+          `,
+        });
+
+        console.log(`✅ Invitation email sent to ${args.email}`);
+        return { success: true, method: "email" };
+      } catch (error) {
+        console.error("Failed to send email via Resend:", error);
+        // Fall through to console logging
+      }
+    }
+
+    // Fallback: log to console (useful for development)
     console.log(`
 ===========================================
-INVITATION EMAIL
+INVITATION EMAIL (Console Fallback)
 ===========================================
 To: ${args.email}
 Subject: You're invited to join ${args.groupName}
@@ -117,21 +146,13 @@ Subject: You're invited to join ${args.groupName}
 You've been invited to join the group "${args.groupName}".
 
 Click the link below to accept the invitation:
-${process.env.SITE_URL || "http://localhost:5173"}/invite/${args.invitationId}
+${inviteUrl}
 
 If you don't have an account yet, you'll be able to create one when you accept the invitation.
 ===========================================
     `);
 
-    // TODO: Implement actual Resend email sending
-    // const resend = new Resend(process.env.RESEND_API_KEY);
-    // await resend.emails.send({
-    //   from: "noreply@yourdomain.com",
-    //   to: args.email,
-    //   subject: `You're invited to join ${args.groupName}`,
-    //   html: `<p>You've been invited to join the group "${args.groupName}".</p>
-    //          <p><a href="${process.env.SITE_URL}/invite/${args.invitationId}">Accept invitation</a></p>`,
-    // });
+    return { success: true, method: "console" };
   },
 });
 
