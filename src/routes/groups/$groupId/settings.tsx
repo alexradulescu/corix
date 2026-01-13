@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, FormEvent } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -11,14 +11,19 @@ export const Route = createFileRoute("/groups/$groupId/settings")({
 
 function GroupSettingsPage() {
   const { groupId } = Route.useParams();
+  const navigate = useNavigate();
   const group = useQuery(api.groups.getGroup, { groupId: groupId as Id<"groups"> });
   const updateGroup = useMutation(api.groups.updateGroup);
+  const softDeleteGroup = useMutation(api.groups.softDeleteGroup);
 
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (group === undefined) {
     return <Loading />;
@@ -58,6 +63,23 @@ function GroupSettingsPage() {
       setError(err instanceof Error ? err.message : "Failed to update group");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (deleteConfirmText !== group?.name) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      await softDeleteGroup({ groupId: groupId as Id<"groups"> });
+      navigate({ to: "/groups" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete group");
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -110,11 +132,67 @@ function GroupSettingsPage() {
       <section>
         <h3 style={{ marginBottom: "1rem", color: "#dc2626" }}>Danger Zone</h3>
         <p style={{ color: "#666", fontSize: "0.875rem", marginBottom: "1rem" }}>
-          Group deletion will be implemented in Phase 11.
+          Soft deleting this group will archive it and remove all members. All data will be preserved but the group will be inaccessible. Only super-admins can restore soft-deleted groups.
         </p>
-        <button disabled style={{ backgroundColor: "#dc2626", opacity: 0.5 }}>
-          Delete Group
-        </button>
+
+        {!showDeleteConfirm ? (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            style={{ backgroundColor: "#dc2626", color: "#fff" }}
+          >
+            Soft Delete Group
+          </button>
+        ) : (
+          <div
+            style={{
+              padding: "1.5rem",
+              backgroundColor: "#fee",
+              border: "2px solid #dc2626",
+              borderRadius: "8px",
+              maxWidth: "500px",
+            }}
+          >
+            <h4 style={{ margin: "0 0 1rem 0", color: "#dc2626" }}>
+              Confirm Group Deletion
+            </h4>
+            <p style={{ marginBottom: "1rem", fontSize: "0.875rem" }}>
+              This action will soft delete the group "<strong>{group.name}</strong>". All members will be removed and the group will be archived.
+            </p>
+            <p style={{ marginBottom: "1rem", fontSize: "0.875rem", fontWeight: 600 }}>
+              Type the group name to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={group.name}
+              style={{ width: "100%", marginBottom: "1rem" }}
+            />
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <button
+                onClick={handleDelete}
+                disabled={deleteConfirmText !== group.name || isDeleting}
+                style={{
+                  backgroundColor: "#dc2626",
+                  color: "#fff",
+                  opacity: deleteConfirmText !== group.name || isDeleting ? 0.5 : 1,
+                }}
+              >
+                {isDeleting ? "Deleting..." : "Confirm Delete"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteConfirmText("");
+                }}
+                disabled={isDeleting}
+                style={{ backgroundColor: "#6b7280", color: "#fff" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );

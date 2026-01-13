@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { logAudit } from "./auditLogs";
 
 // Get all groups the current user is a member of
 export const myGroups = query({
@@ -228,5 +229,139 @@ export const getMembers = query({
       if (aOrder !== bOrder) return aOrder - bOrder;
       return (a.email || "").localeCompare(b.email || "");
     });
+  },
+});
+
+// Soft delete a group
+export const softDeleteGroup = mutation({
+  args: {
+    groupId: v.id("groups"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    const group = await ctx.db.get(args.groupId);
+    if (!group) {
+      throw new Error("Group not found");
+    }
+
+    if (group.deletedAt) {
+      throw new Error("Group is already soft deleted");
+    }
+
+    // Check if user is an admin
+    const membership = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_group_user", (q) =>
+        q.eq("groupId", args.groupId).eq("userId", userId)
+      )
+      .first();
+
+    if (!membership || membership.role !== "admin") {
+      throw new Error("Only admins can soft delete groups");
+    }
+
+    // Set deletedAt on the group
+    await ctx.db.patch(args.groupId, {
+      deletedAt: Date.now(),
+      deletedBy: userId,
+    });
+
+    // Get all memberships and set them to removed
+    const memberships = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_group", (q) => q.eq("groupId", args.groupId))
+      .collect();
+
+    for (const membership of memberships) {
+      await ctx.db.patch(membership._id, {
+        role: "removed",
+        updatedAt: Date.now(),
+        updatedBy: userId,
+      });
+    }
+
+    // Log audit event
+    await logAudit(ctx, {
+      groupId: args.groupId,
+      actorId: userId,
+      action: "group_soft_deleted",
+      details: {
+        deletedBy: userId,
+      },
+    });
+
+    return { success: true };
+  },
+});
+
+// Restore a soft-deleted group (super-admin only)
+export const restoreGroup = mutation({
+  args: {
+    groupId: v.id("groups"),
+    newAdminId: v.id("users"), // Must specify at least one admin when restoring
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Not authenticated");
+    }
+
+    // Check if user is a super-admin
+    const user = await ctx.db.get(userId);
+    if (!user || !user.isSuperAdmin) {
+      throw new Error("Only super-admins can restore groups");
+    }
+
+    const group = await ctx.db.get(args.groupId);
+    if (!group) {
+      throw new Error("Group not found");
+    }
+
+    if (!group.deletedAt) {
+      throw new Error("Group is not soft deleted");
+    }
+
+    // Clear deletedAt on the group
+    await ctx.db.patch(args.groupId, {
+      deletedAt: undefined,
+      deletedBy: undefined,
+    });
+
+    // Find the membership for the new admin
+    const newAdminMembership = await ctx.db
+      .query("groupMemberships")
+      .withIndex("by_group_user", (q) =>
+        q.eq("groupId", args.groupId).eq("userId", args.newAdminId)
+      )
+      .first();
+
+    if (!newAdminMembership) {
+      throw new Error("New admin must be a member of the group");
+    }
+
+    // Set the new admin's role to admin
+    await ctx.db.patch(newAdminMembership._id, {
+      role: "admin",
+      updatedAt: Date.now(),
+      updatedBy: userId,
+    });
+
+    // Log audit event
+    await logAudit(ctx, {
+      groupId: args.groupId,
+      actorId: userId,
+      targetId: args.newAdminId,
+      action: "group_restored",
+      details: {
+        restoredBy: userId,
+        newAdmin: args.newAdminId,
+      },
+    });
+
+    return { success: true };
   },
 });
