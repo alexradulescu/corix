@@ -29,3 +29,23 @@ export function validatePassword(password: string): PasswordValidationResult {
 
   return { valid: errors.length === 0, errors };
 }
+
+/**
+ * Returns a rough strength label for a password.
+ * Useful for showing a visual strength indicator to the user.
+ * Does NOT replace server-side validation — it's a UX aid only.
+ */
+export function getPasswordStrength(password: string): "weak" | "fair" | "strong" {
+  if (password.length < 8) return "weak";
+
+  let score = 0;
+  if (/[a-z]/.test(password)) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  if (SYMBOL_REGEX.test(password)) score++;
+  if (password.length >= 16) score++;
+
+  if (score >= 4) return "strong";
+  if (score >= 3) return "fair";
+  return "weak";
+}

@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { Loading } from "../../../shared/components/Loading";
+import { GroupRoleGuard } from "../../../shared/components/GroupRoleGuard";
 
 export const Route = createFileRoute("/groups/$groupId/settings")({
   component: GroupSettingsPage,
@@ -84,6 +85,10 @@ function GroupSettingsPage() {
   };
 
   return (
+    <GroupRoleGuard
+      groupId={groupId as Id<"groups">}
+      requiredRoles={["admin"]}
+    >
     <div>
       <h2 style={{ marginBottom: "1rem" }}>Group Settings</h2>
 
@@ -195,5 +200,6 @@ function GroupSettingsPage() {
         )}
       </section>
     </div>
+    </GroupRoleGuard>
   );
 }

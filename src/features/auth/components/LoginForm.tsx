@@ -2,6 +2,7 @@ import { useState, FormEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { GoogleOAuthButton } from "./GoogleOAuthButton";
+import styles from "./auth.module.css";
 
 interface LoginFormProps {
   onNeedsTwoFactor?: () => void;
@@ -55,28 +56,18 @@ export function LoginForm({ onNeedsTwoFactor }: LoginFormProps) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+    <div className={styles.container}>
       <GoogleOAuthButton mode="signin" />
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "1rem",
-          color: "#666",
-          fontSize: "0.875rem",
-        }}
-      >
-        <hr style={{ flex: 1, border: "none", borderTop: "1px solid #ddd" }} />
+      <div className={styles.divider}>
+        <hr />
         or
-        <hr style={{ flex: 1, border: "none", borderTop: "1px solid #ddd" }} />
+        <hr />
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div>
-          <label htmlFor="email" style={{ display: "block", marginBottom: "0.25rem" }}>
-            Email
-          </label>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="email">Email</label>
           <input
             id="email"
             type="email"
@@ -88,10 +79,8 @@ export function LoginForm({ onNeedsTwoFactor }: LoginFormProps) {
           />
         </div>
 
-        <div>
-          <label htmlFor="password" style={{ display: "block", marginBottom: "0.25rem" }}>
-            Password
-          </label>
+        <div className={styles.field}>
+          <label htmlFor="password">Password</label>
           <input
             id="password"
             type="password"
@@ -102,17 +91,13 @@ export function LoginForm({ onNeedsTwoFactor }: LoginFormProps) {
           />
         </div>
 
-        {error && (
-          <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>
-            {error}
-          </div>
-        )}
+        {error && <div className={styles.error}>{error}</div>}
 
-        <button type="submit" disabled={isSubmitting} style={{ marginTop: "0.5rem" }}>
+        <button type="submit" disabled={isSubmitting} className={styles.submitButton}>
           {isSubmitting ? "Signing in..." : "Sign in"}
         </button>
 
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.875rem" }}>
+        <div className={styles.links}>
           <Link to="/forgot-password">Forgot password?</Link>
           <Link to="/register">Create account</Link>
         </div>

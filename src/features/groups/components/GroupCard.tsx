@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { GroupWithMembership } from "../types";
+import styles from "./groups.module.css";
 
 interface GroupCardProps {
   group: GroupWithMembership;
@@ -22,44 +23,34 @@ const roleLabels: Record<string, string> = {
 export function GroupCard({ group }: GroupCardProps) {
   const isRemoved = group.membership.role === "removed";
   const isDeleted = !!group.deletedAt;
+  const muted = isRemoved || isDeleted;
 
   return (
-    <div
-      style={{
-        padding: "1rem",
-        border: "1px solid #ddd",
-        borderRadius: "8px",
-        backgroundColor: isRemoved || isDeleted ? "#fafafa" : "white",
-        opacity: isRemoved || isDeleted ? 0.8 : 1,
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+    <div className={`${styles.card} ${muted ? styles.cardMuted : ""}`}>
+      <div className={styles.cardHeader}>
         <div style={{ flex: 1 }}>
           {isRemoved ? (
-            <h3 style={{ marginBottom: "0.5rem", color: "#666" }}>{group.name}</h3>
+            <h3 className={styles.cardTitle} style={{ color: "#666" }}>{group.name}</h3>
           ) : (
             <Link
               to="/groups/$groupId"
               params={{ groupId: group._id }}
               style={{ textDecoration: "none" }}
             >
-              <h3 style={{ marginBottom: "0.5rem" }}>{group.name}</h3>
+              <h3 className={styles.cardTitle}>{group.name}</h3>
             </Link>
           )}
 
-          <p style={{ fontSize: "0.75rem", color: "#999" }}>
+          <p className={styles.cardMeta}>
             Joined {new Date(group.membership.joinedAt).toLocaleDateString()}
           </p>
         </div>
 
         <span
+          className={styles.badge}
           style={{
-            padding: "0.25rem 0.5rem",
-            fontSize: "0.75rem",
-            borderRadius: "4px",
             backgroundColor: roleColors[group.membership.role] + "20",
             color: roleColors[group.membership.role],
-            fontWeight: 500,
           }}
         >
           {roleLabels[group.membership.role] || group.membership.role}
