@@ -1,16 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { GroupCard } from "./GroupCard";
-
-interface GroupWithMembership {
-  _id: string;
-  name: string;
-  createdAt: number;
-  deletedAt?: number;
-  membership: {
-    role: string;
-    joinedAt: number;
-  };
-}
+import { GroupWithMembership } from "../types";
 
 interface GroupListProps {
   groups: GroupWithMembership[];

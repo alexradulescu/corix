@@ -11,5 +11,5 @@ export { TotpVerify } from "./components/TotpVerify";
 export { useAuth } from "./hooks/useAuth";
 
 // Utils
-export { validatePassword, getPasswordStrength } from "./utils/passwordValidation";
+export { validatePassword } from "./utils/passwordValidation";
 export type { PasswordValidationResult } from "./utils/passwordValidation";

@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import QRCode from "qrcode";
 
@@ -9,7 +9,6 @@ interface TotpSetupProps {
 }
 
 export function TotpSetup({ onComplete, onCancel }: TotpSetupProps) {
-  const user = useQuery(api.users.currentUser);
   const generateTotpSecret = useMutation(api.users.generateTotpSecret);
   const enableTotp = useMutation(api.users.enableTotp);
 
@@ -28,9 +27,8 @@ export function TotpSetup({ onComplete, onCancel }: TotpSetupProps) {
       const result = await generateTotpSecret();
       setSecret(result.secret);
 
-      // Generate QR code URL
-      const otpAuthUrl = `otpauth://totp/${encodeURIComponent("Corix")}:${encodeURIComponent(user?.email || "user")}?secret=${result.secret}&issuer=${encodeURIComponent("Corix")}`;
-      const qrUrl = await QRCode.toDataURL(otpAuthUrl);
+      // Use the canonical OTP URI returned by the backend (avoids duplication)
+      const qrUrl = await QRCode.toDataURL(result.uri);
       setQrCodeUrl(qrUrl);
 
       setStep("verify");

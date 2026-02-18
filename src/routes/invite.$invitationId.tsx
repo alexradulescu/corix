@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../convex/_generated/api";
@@ -24,14 +24,7 @@ function InviteAcceptancePage() {
   const [isAccepting, setIsAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-accept when user is logged in
-  useEffect(() => {
-    if (invitation && invitation.status === "pending" && !isAccepting && !error) {
-      handleAccept();
-    }
-  }, [invitation]);
-
-  const handleAccept = async () => {
+  const handleAccept = useCallback(async () => {
     setIsAccepting(true);
     setError(null);
 
@@ -39,22 +32,19 @@ function InviteAcceptancePage() {
       const result = await acceptInvitation({
         invitationId: invitationId as Id<"invitations">,
       });
-      // Redirect to the group
       navigate({ to: "/groups/$groupId", params: { groupId: result.groupId } });
     } catch (err) {
       setIsAccepting(false);
-      if (err instanceof Error) {
-        // Check if error is due to not being logged in
-        if (err.message.includes("Not authenticated") || err.message.includes("not for your email")) {
-          setError(err.message);
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError("Failed to accept invitation");
-      }
+      setError(err instanceof Error ? err.message : "Failed to accept invitation");
     }
-  };
+  }, [acceptInvitation, invitationId, navigate]);
+
+  // Auto-accept when user is logged in and the invitation is pending
+  useEffect(() => {
+    if (invitation && invitation.status === "pending" && !isAccepting && !error) {
+      handleAccept();
+    }
+  }, [invitation, isAccepting, error, handleAccept]);
 
   // Loading state
   if (invitation === undefined) {
@@ -89,7 +79,7 @@ function InviteAcceptancePage() {
       <div style={{ maxWidth: "500px", margin: "2rem auto", padding: "1rem", textAlign: "center" }}>
         <h1>Invitation already accepted</h1>
         <p style={{ marginTop: "1rem", color: "#666" }}>
-          This invitation to join "{invitation.groupName}" has already been accepted.
+          This invitation to join &ldquo;{invitation.groupName}&rdquo; has already been accepted.
         </p>
         <p style={{ marginTop: "1.5rem" }}>
           <Link to="/groups">
@@ -106,7 +96,7 @@ function InviteAcceptancePage() {
       <div style={{ maxWidth: "500px", margin: "2rem auto", padding: "1rem", textAlign: "center" }}>
         <h1>Invitation revoked</h1>
         <p style={{ marginTop: "1rem", color: "#666" }}>
-          This invitation to join "{invitation.groupName}" has been revoked.
+          This invitation to join &ldquo;{invitation.groupName}&rdquo; has been revoked.
         </p>
         <p style={{ marginTop: "1.5rem" }}>
           <Link to="/login">
@@ -117,7 +107,7 @@ function InviteAcceptancePage() {
     );
   }
 
-  // Error state (email mismatch or other errors)
+  // Error state
   if (error) {
     const isAuthError = error.includes("Not authenticated");
     const isEmailMismatch = error.includes("not for your email");
@@ -166,7 +156,8 @@ function InviteAcceptancePage() {
               <button
                 onClick={async () => {
                   await signOut();
-                  window.location.href = `/invite/${invitationId}`;
+                  // Use navigate so the router handles the transition instead of a full reload
+                  navigate({ to: "/invite/$invitationId", params: { invitationId } });
                 }}
               >
                 Log out and try again
@@ -193,7 +184,7 @@ function InviteAcceptancePage() {
         <h1>Accepting invitation...</h1>
         <Loading />
         <p style={{ marginTop: "1rem", color: "#666" }}>
-          You're being added to "{invitation.groupName}"
+          You&rsquo;re being added to &ldquo;{invitation.groupName}&rdquo;
         </p>
       </div>
     );
@@ -211,7 +202,7 @@ function InviteAcceptancePage() {
         border: "1px solid #e5e7eb"
       }}>
         <p style={{ fontSize: "1.125rem", marginBottom: "0.5rem" }}>
-          You've been invited to join
+          You&rsquo;ve been invited to join
         </p>
         <h2 style={{ margin: "0.5rem 0", fontSize: "1.5rem" }}>
           {invitation.groupName}

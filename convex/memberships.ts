@@ -9,7 +9,13 @@ export const changeRole = mutation({
   args: {
     groupId: v.id("groups"),
     userId: v.id("users"),
-    newRole: v.string(),
+    // Use union literal validator so Convex rejects invalid roles at the API boundary
+    newRole: v.union(
+      v.literal("admin"),
+      v.literal("editor"),
+      v.literal("viewer"),
+      v.literal("removed")
+    ),
   },
   handler: async (ctx, args) => {
     const actorId = await getAuthUserId(ctx);
@@ -17,10 +23,7 @@ export const changeRole = mutation({
       throw new Error("Not authenticated");
     }
 
-    const newRole = args.newRole as Role;
-    if (!["admin", "editor", "viewer", "removed"].includes(newRole)) {
-      throw new Error("Invalid role");
-    }
+    const newRole: Role = args.newRole;
 
     // Check if actor has permission to manage members
     const actorPermission = await checkPermission(ctx, actorId, args.groupId, ["admin"]);
@@ -40,7 +43,7 @@ export const changeRole = mutation({
       throw new Error("User is not a member of this group");
     }
 
-    const currentRole = targetMembership.role as Role;
+    const currentRole: Role = targetMembership.role;
 
     // If demoting an admin, check if they're the last admin
     if (currentRole === "admin" && newRole !== "admin") {

@@ -2,6 +2,31 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
+// Reusable union validators — keep in sync with types in auditLogs.ts
+const memberRole = v.union(
+  v.literal("admin"),
+  v.literal("editor"),
+  v.literal("viewer"),
+  v.literal("removed")
+);
+
+const invitationStatus = v.union(
+  v.literal("pending"),
+  v.literal("accepted"),
+  v.literal("revoked")
+);
+
+const auditAction = v.union(
+  v.literal("member_invited"),
+  v.literal("member_joined"),
+  v.literal("member_left"),
+  v.literal("member_removed"),
+  v.literal("role_changed"),
+  v.literal("invite_revoked"),
+  v.literal("group_soft_deleted"),
+  v.literal("group_restored")
+);
+
 export default defineSchema({
   ...authTables,
 
@@ -15,7 +40,7 @@ export default defineSchema({
     deletedUserId: v.optional(v.string()), // "Deleted User {uniqueId}" replacement
 
     // 2FA
-    totpSecret: v.optional(v.string()), // Encrypted TOTP secret
+    totpSecret: v.optional(v.string()),
     totpEnabled: v.optional(v.boolean()),
 
     // System
@@ -38,14 +63,13 @@ export default defineSchema({
     .index("by_deleted", ["deletedAt"])
     .index("by_creator", ["createdBy"]),
 
-  // Role enum: "admin" | "editor" | "viewer" | "removed"
   groupMemberships: defineTable({
     groupId: v.id("groups"),
     userId: v.id("users"),
-    role: v.string(), // "admin" | "editor" | "viewer" | "removed"
+    role: memberRole,
     joinedAt: v.number(),
     updatedAt: v.number(),
-    updatedBy: v.id("users"), // Who last changed the role
+    updatedBy: v.id("users"),
   })
     .index("by_group", ["groupId"])
     .index("by_user", ["userId"])
@@ -54,10 +78,10 @@ export default defineSchema({
 
   invitations: defineTable({
     groupId: v.id("groups"),
-    email: v.string(), // Invitee email (may or may not be registered)
+    email: v.string(),
     invitedBy: v.id("users"),
     createdAt: v.number(),
-    status: v.string(), // "pending" | "accepted" | "revoked"
+    status: invitationStatus,
     acceptedAt: v.optional(v.number()),
     acceptedBy: v.optional(v.id("users")),
   })
@@ -78,10 +102,10 @@ export default defineSchema({
 
   auditLogs: defineTable({
     groupId: v.id("groups"),
-    actorId: v.id("users"), // Who performed the action
-    targetId: v.optional(v.id("users")), // Affected user (if applicable)
-    action: v.string(), // Action type
-    details: v.optional(v.string()), // JSON string with additional context
+    actorId: v.id("users"),
+    targetId: v.optional(v.id("users")),
+    action: auditAction,
+    details: v.optional(v.string()), // JSON-encoded extra context
     createdAt: v.number(),
   })
     .index("by_group", ["groupId"])

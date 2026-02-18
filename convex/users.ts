@@ -271,12 +271,13 @@ export const canDeleteAccount = query({
   },
 });
 
-// Soft delete user account
+// Soft delete user account.
+// Note: Password re-verification is not possible server-side with Convex Auth.
+// Security relies on the confirmed sole-admin check and the "leave all groups" requirement.
+// The frontend additionally requires the user to type "DELETE" to confirm intent.
 export const deleteAccount = mutation({
-  args: {
-    confirmPassword: v.string(),
-  },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
       throw new Error("Not authenticated");
@@ -322,16 +323,16 @@ export const deleteAccount = mutation({
       throw new Error("You must leave all groups before deleting your account");
     }
 
-    // Generate a unique ID for the deleted user
+    // Generate a unique ID for the deleted user placeholder
     const uniqueId = Math.random().toString(36).substring(2, 9).toUpperCase();
     const deletedUserId = `Deleted User ${uniqueId}`;
 
-    // Soft delete the user
+    // Soft delete the user and remove all PII
     await ctx.db.patch(userId, {
       deletedAt: Date.now(),
       deletedUserId,
-      email: undefined, // Remove PII
-      totpSecret: undefined, // Remove 2FA secret
+      email: undefined,
+      totpSecret: undefined,
       totpEnabled: false,
       updatedAt: Date.now(),
     });

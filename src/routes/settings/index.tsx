@@ -18,7 +18,6 @@ function SettingsProfilePage() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [deletePassword, setDeletePassword] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,16 +34,11 @@ function SettingsProfilePage() {
       return;
     }
 
-    if (!deletePassword.trim()) {
-      setError("Please enter your password");
-      return;
-    }
-
     setIsDeleting(true);
     setError(null);
 
     try {
-      await deleteAccount({ confirmPassword: deletePassword });
+      await deleteAccount({});
       await signOut();
       navigate({ to: "/login" });
     } catch (err) {
@@ -219,29 +213,6 @@ function SettingsProfilePage() {
 
             <div style={{ marginBottom: "1rem" }}>
               <label
-                htmlFor="delete-password"
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                }}
-              >
-                Enter your password to confirm:
-              </label>
-              <input
-                id="delete-password"
-                type="password"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-                placeholder="Password"
-                style={{ width: "100%" }}
-                disabled={isDeleting}
-              />
-            </div>
-
-            <div style={{ marginBottom: "1rem" }}>
-              <label
                 htmlFor="delete-confirm"
                 style={{
                   display: "block",
@@ -266,12 +237,11 @@ function SettingsProfilePage() {
             <div style={{ display: "flex", gap: "0.5rem" }}>
               <button
                 onClick={handleDeleteAccount}
-                disabled={deleteConfirmText !== "DELETE" || !deletePassword.trim() || isDeleting}
+                disabled={deleteConfirmText !== "DELETE" || isDeleting}
                 style={{
                   backgroundColor: "#dc2626",
                   color: "#fff",
-                  opacity:
-                    deleteConfirmText !== "DELETE" || !deletePassword.trim() || isDeleting ? 0.5 : 1,
+                  opacity: deleteConfirmText !== "DELETE" || isDeleting ? 0.5 : 1,
                 }}
               >
                 {isDeleting ? "Deleting..." : "Permanently Delete Account"}
@@ -280,7 +250,6 @@ function SettingsProfilePage() {
                 onClick={() => {
                   setShowDeleteConfirm(false);
                   setDeleteConfirmText("");
-                  setDeletePassword("");
                   setError(null);
                 }}
                 disabled={isDeleting}

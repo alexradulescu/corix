@@ -19,7 +19,7 @@ function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleHardDelete = async (userId: Id<"users">, userEmail: string) => {
+  const handleHardDelete = async (userId: Id<"users">) => {
     if (confirmText !== "DELETE") {
       setError("Please type DELETE to confirm");
       return;
@@ -52,10 +52,8 @@ function AdminUsersPage() {
       <header className={styles.header}>
         <h1>Admin: Users Management</h1>
         <nav className={styles.nav}>
-          <Link to="/admin/groups">Groups</Link>
-          <Link to="/admin/users" className={styles.activeLink}>
-            Users
-          </Link>
+          <Link to="/admin/groups" activeProps={{ className: styles.activeLink }}>Groups</Link>
+          <Link to="/admin/users" activeProps={{ className: styles.activeLink }}>Users</Link>
           <Link to="/groups">Back to App</Link>
         </nav>
       </header>
@@ -201,12 +199,8 @@ function AdminUsersPage() {
             <div className={styles.modalActions}>
               <button
                 onClick={() => {
-                  const user = users.find((u) => u._id === deletingUserId);
-                  if (user) {
-                    handleHardDelete(
-                      deletingUserId,
-                      user.email || user.deletedUserId || "Unknown"
-                    );
+                  if (deletingUserId) {
+                    handleHardDelete(deletingUserId);
                   }
                 }}
                 disabled={confirmText !== "DELETE" || isDeleting}
