@@ -1,39 +1,19 @@
-import { query, internalMutation } from "./_generated/server";
+import { query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { checkPermission } from "./lib/permissions";
 import { Id } from "./_generated/dataModel";
 
-// Action types:
-// - "member_invited"
-// - "member_joined"
-// - "member_left"
-// - "member_removed"
-// - "role_changed"
-// - "invite_revoked"
-// - "group_soft_deleted"
-// - "group_restored"
-
-// Internal mutation to create an audit log entry
-export const createAuditLog = internalMutation({
-  args: {
-    groupId: v.id("groups"),
-    actorId: v.id("users"),
-    targetId: v.optional(v.id("users")),
-    action: v.string(),
-    details: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.insert("auditLogs", {
-      groupId: args.groupId,
-      actorId: args.actorId,
-      targetId: args.targetId,
-      action: args.action,
-      details: args.details,
-      createdAt: Date.now(),
-    });
-  },
-});
+// Recognised audit action types
+export type AuditAction =
+  | "member_invited"
+  | "member_joined"
+  | "member_left"
+  | "member_removed"
+  | "role_changed"
+  | "invite_revoked"
+  | "group_soft_deleted"
+  | "group_restored";
 
 // Get audit logs for a group (admin only)
 export const getGroupAuditLogs = query({
@@ -67,8 +47,8 @@ export const getGroupAuditLogs = query({
 
         return {
           ...log,
-          actorEmail: actor?.email || "Unknown User",
-          targetEmail: target?.email || null,
+          actorEmail: actor?.email || actor?.deletedUserId || "Unknown User",
+          targetEmail: target?.email || target?.deletedUserId || null,
         };
       })
     );
@@ -77,31 +57,29 @@ export const getGroupAuditLogs = query({
   },
 });
 
-// Helper function to format action type into human-readable text
-export function formatActionType(action: string): string {
-  const actionMap: Record<string, string> = {
-    member_invited: "Member Invited",
-    member_joined: "Member Joined",
-    member_left: "Member Left",
-    member_removed: "Member Removed",
-    role_changed: "Role Changed",
-    invite_revoked: "Invitation Revoked",
-    group_soft_deleted: "Group Soft Deleted",
-    group_restored: "Group Restored",
-  };
+// Human-readable labels for every audit action type.
+// Single source of truth — imported by the frontend component.
+export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  member_invited: "Member Invited",
+  member_joined: "Member Joined",
+  member_left: "Member Left",
+  member_removed: "Member Removed",
+  role_changed: "Role Changed",
+  invite_revoked: "Invitation Revoked",
+  group_soft_deleted: "Group Soft Deleted",
+  group_restored: "Group Restored",
+};
 
-  return actionMap[action] || action;
-}
-
-// Helper to log audit events (to be called from other mutations)
+// Helper to write an audit log entry from within a mutation.
+// Using MutationCtx ensures this can only be called from mutations, not queries.
 export async function logAudit(
-  ctx: any,
+  ctx: MutationCtx,
   params: {
     groupId: Id<"groups">;
     actorId: Id<"users">;
     targetId?: Id<"users">;
-    action: string;
-    details?: Record<string, any>;
+    action: AuditAction;
+    details?: Record<string, unknown>;
   }
 ) {
   await ctx.db.insert("auditLogs", {

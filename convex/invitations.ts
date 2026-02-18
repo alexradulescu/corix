@@ -29,20 +29,20 @@ export const createInvitation = mutation({
       throw new Error("Only admins can invite members");
     }
 
-    // Check if user is already a member (any role including removed)
-    const existingMembership = await ctx.db
-      .query("groupMemberships")
-      .withIndex("by_group", (q) => q.eq("groupId", args.groupId))
-      .collect();
-
-    // Get the user ID for this email if they exist
+    // Get the user ID for this email if they exist and check membership
     const existingUser = await ctx.db
       .query("users")
       .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
     if (existingUser) {
-      const membership = existingMembership.find((m) => m.userId === existingUser._id);
+      // Use the compound index for an efficient point lookup instead of scanning all members
+      const membership = await ctx.db
+        .query("groupMemberships")
+        .withIndex("by_group_user", (q) =>
+          q.eq("groupId", args.groupId).eq("userId", existingUser._id)
+        )
+        .first();
       if (membership) {
         throw new Error("User is already a member of this group");
       }
@@ -107,6 +107,17 @@ export const sendInvitationEmail = action({
   handler: async (ctx, args) => {
     const inviteUrl = `${process.env.SITE_URL || "http://localhost:5173"}/invite/${args.invitationId}`;
 
+    // Escape HTML special characters to prevent injection in the email body
+    const escapeHtml = (text: string) =>
+      text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+    const safeGroupName = escapeHtml(args.groupName);
+
     // Try to send email via Resend if configured
     if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith("re_")) {
       try {
@@ -118,8 +129,8 @@ export const sendInvitationEmail = action({
           to: args.email,
           subject: `You're invited to join ${args.groupName}`,
           html: `
-            <h2>You've been invited to join ${args.groupName}</h2>
-            <p>You've been invited to join the group "${args.groupName}" on Corix.</p>
+            <h2>You've been invited to join ${safeGroupName}</h2>
+            <p>You've been invited to join the group &ldquo;${safeGroupName}&rdquo; on Corix.</p>
             <p><a href="${inviteUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Accept Invitation</a></p>
             <p>Or copy and paste this link into your browser:</p>
             <p>${inviteUrl}</p>

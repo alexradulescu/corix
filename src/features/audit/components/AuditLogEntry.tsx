@@ -1,25 +1,11 @@
 import { Doc } from "../../../../convex/_generated/dataModel";
+import { AUDIT_ACTION_LABELS } from "../../../../convex/auditLogs";
 
 interface AuditLogEntryProps {
   log: Doc<"auditLogs"> & {
     actorEmail: string;
     targetEmail: string | null;
   };
-}
-
-function formatActionType(action: string): string {
-  const actionMap: Record<string, string> = {
-    member_invited: "Member Invited",
-    member_joined: "Member Joined",
-    member_left: "Member Left",
-    member_removed: "Member Removed",
-    role_changed: "Role Changed",
-    invite_revoked: "Invitation Revoked",
-    group_soft_deleted: "Group Soft Deleted",
-    group_restored: "Group Restored",
-  };
-
-  return actionMap[action] || action;
 }
 
 function formatActionDescription(log: AuditLogEntryProps["log"]): string {
@@ -57,7 +43,7 @@ function formatActionDescription(log: AuditLogEntryProps["log"]): string {
 
 export function AuditLogEntry({ log }: AuditLogEntryProps) {
   const formattedDate = new Date(log.createdAt).toLocaleString();
-  const actionType = formatActionType(log.action);
+  const actionType = AUDIT_ACTION_LABELS[log.action as keyof typeof AUDIT_ACTION_LABELS] ?? log.action;
   const description = formatActionDescription(log);
 
   return (

@@ -124,7 +124,8 @@ export const getRecentMessages = query({
       return [];
     }
 
-    const limit = args.limit || 50;
+    const MAX_LIMIT = 200;
+    const limit = Math.min(args.limit || 50, MAX_LIMIT);
 
     // Get messages ordered by createdAt descending (newest first)
     const messages = await ctx.db

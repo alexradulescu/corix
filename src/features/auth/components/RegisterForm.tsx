@@ -1,7 +1,14 @@
 import { useState, FormEvent } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Link } from "@tanstack/react-router";
-import { validatePassword } from "../utils/passwordValidation";
+import { validatePassword, getPasswordStrength } from "../utils/passwordValidation";
+import styles from "./auth.module.css";
+
+const strengthConfig = {
+  weak:   { color: "#dc2626", width: "33%",  label: "Weak"   },
+  fair:   { color: "#d97706", width: "66%",  label: "Fair"   },
+  strong: { color: "#16a34a", width: "100%", label: "Strong" },
+} as const;
 import { GoogleOAuthButton } from "./GoogleOAuthButton";
 
 export function RegisterForm() {
@@ -11,6 +18,7 @@ export function RegisterForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+  const [strength, setStrength] = useState<"weak" | "fair" | "strong" | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -19,8 +27,10 @@ export function RegisterForm() {
     if (value) {
       const { errors } = validatePassword(value);
       setPasswordErrors(errors);
+      setStrength(getPasswordStrength(value));
     } else {
       setPasswordErrors([]);
+      setStrength(null);
     }
   };
 
@@ -73,28 +83,18 @@ export function RegisterForm() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+    <div className={styles.container}>
       <GoogleOAuthButton mode="signup" />
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "1rem",
-          color: "#666",
-          fontSize: "0.875rem",
-        }}
-      >
-        <hr style={{ flex: 1, border: "none", borderTop: "1px solid #ddd" }} />
+      <div className={styles.divider}>
+        <hr />
         or
-        <hr style={{ flex: 1, border: "none", borderTop: "1px solid #ddd" }} />
+        <hr />
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div>
-          <label htmlFor="email" style={{ display: "block", marginBottom: "0.25rem" }}>
-            Email
-          </label>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="email">Email</label>
           <input
             id="email"
             type="email"
@@ -106,10 +106,8 @@ export function RegisterForm() {
           />
         </div>
 
-        <div>
-          <label htmlFor="password" style={{ display: "block", marginBottom: "0.25rem" }}>
-            Password
-          </label>
+        <div className={styles.field}>
+          <label htmlFor="password">Password</label>
           <input
             id="password"
             type="password"
@@ -119,6 +117,24 @@ export function RegisterForm() {
             autoComplete="new-password"
             placeholder="At least 12 characters"
           />
+          {password && strength && (
+            <div style={{ marginTop: "0.375rem" }}>
+              <div style={{ height: "4px", borderRadius: "2px", backgroundColor: "#e5e7eb" }}>
+                <div
+                  style={{
+                    height: "100%",
+                    borderRadius: "2px",
+                    width: strengthConfig[strength].width,
+                    backgroundColor: strengthConfig[strength].color,
+                    transition: "width 0.2s, background-color 0.2s",
+                  }}
+                />
+              </div>
+              <span style={{ fontSize: "0.75rem", color: strengthConfig[strength].color }}>
+                {strengthConfig[strength].label}
+              </span>
+            </div>
+          )}
           {passwordErrors.length > 0 && (
             <ul style={{ color: "#dc2626", fontSize: "0.875rem", marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
               {passwordErrors.map((err, i) => (
@@ -128,10 +144,8 @@ export function RegisterForm() {
           )}
         </div>
 
-        <div>
-          <label htmlFor="confirmPassword" style={{ display: "block", marginBottom: "0.25rem" }}>
-            Confirm Password
-          </label>
+        <div className={styles.field}>
+          <label htmlFor="confirmPassword">Confirm Password</label>
           <input
             id="confirmPassword"
             type="password"
@@ -143,13 +157,9 @@ export function RegisterForm() {
           />
         </div>
 
-        {error && (
-          <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>
-            {error}
-          </div>
-        )}
+        {error && <div className={styles.error}>{error}</div>}
 
-        <button type="submit" disabled={isSubmitting} style={{ marginTop: "0.5rem" }}>
+        <button type="submit" disabled={isSubmitting} className={styles.submitButton}>
           {isSubmitting ? "Creating account..." : "Create account"}
         </button>
 

@@ -1,7 +1,8 @@
-// Minimum 12 characters
-// At least one letter (a-z, A-Z)
-// At least one number (0-9)
-// At least one symbol
+// Password requirements:
+// - Minimum 12 characters
+// - At least one letter (a-z, A-Z)
+// - At least one number (0-9)
+// - At least one symbol
 
 const SYMBOL_REGEX = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/;
 
@@ -29,8 +30,13 @@ export function validatePassword(password: string): PasswordValidationResult {
   return { valid: errors.length === 0, errors };
 }
 
-export function getPasswordStrength(password: string): "weak" | "medium" | "strong" {
-  if (password.length < 12) return "weak";
+/**
+ * Returns a rough strength label for a password.
+ * Useful for showing a visual strength indicator to the user.
+ * Does NOT replace server-side validation — it's a UX aid only.
+ */
+export function getPasswordStrength(password: string): "weak" | "fair" | "strong" {
+  if (password.length < 8) return "weak";
 
   let score = 0;
   if (/[a-z]/.test(password)) score++;
@@ -40,6 +46,6 @@ export function getPasswordStrength(password: string): "weak" | "medium" | "stro
   if (password.length >= 16) score++;
 
   if (score >= 4) return "strong";
-  if (score >= 3) return "medium";
+  if (score >= 3) return "fair";
   return "weak";
 }

@@ -3,6 +3,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { validateEmail } from "../../../shared/utils/validation";
+import { useNotificationStore } from "../../../stores/notificationStore";
 
 interface InviteFormProps {
   groupId: Id<"groups">;
@@ -11,18 +12,16 @@ interface InviteFormProps {
 
 export function InviteForm({ groupId, onSuccess }: InviteFormProps) {
   const createInvitation = useMutation(api.invitations.createInvitation);
+  const addNotification = useNotificationStore((s) => s.addNotification);
 
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
 
-    // Validate email
     const emailError = validateEmail(email);
     if (emailError) {
       setError(emailError);
@@ -30,12 +29,11 @@ export function InviteForm({ groupId, onSuccess }: InviteFormProps) {
     }
 
     const trimmedEmail = email.trim().toLowerCase();
-
     setIsSubmitting(true);
 
     try {
       await createInvitation({ groupId, email: trimmedEmail });
-      setSuccess(`Invitation sent to ${trimmedEmail}`);
+      addNotification(`Invitation sent to ${trimmedEmail}`, "success");
       setEmail("");
       if (onSuccess) {
         onSuccess();
@@ -70,12 +68,6 @@ export function InviteForm({ groupId, onSuccess }: InviteFormProps) {
       {error && (
         <div style={{ color: "#dc2626", fontSize: "0.875rem", padding: "0.5rem", backgroundColor: "#fee", borderRadius: "4px" }}>
           {error}
-        </div>
-      )}
-
-      {success && (
-        <div style={{ color: "#059669", fontSize: "0.875rem", padding: "0.5rem", backgroundColor: "#d1fae5", borderRadius: "4px" }}>
-          {success}
         </div>
       )}
 

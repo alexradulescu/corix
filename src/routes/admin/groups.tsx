@@ -77,10 +77,8 @@ function AdminGroupsPage() {
       <header className={styles.header}>
         <h1>Admin: Groups Management</h1>
         <nav className={styles.nav}>
-          <Link to="/admin/groups" className={styles.activeLink}>
-            Groups
-          </Link>
-          <Link to="/admin/users">Users</Link>
+          <Link to="/admin/groups" activeProps={{ className: styles.activeLink }}>Groups</Link>
+          <Link to="/admin/users" activeProps={{ className: styles.activeLink }}>Users</Link>
           <Link to="/groups">Back to App</Link>
         </nav>
       </header>

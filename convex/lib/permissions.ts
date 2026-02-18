@@ -34,8 +34,7 @@ export async function checkPermission(
     return { allowed: false, error: "Not a member of this group" };
   }
 
-  const userRole = membership.role as Role;
-  if (!requiredRoles.includes(userRole)) {
+  if (!requiredRoles.includes(membership.role as Role)) {
     return {
       allowed: false,
       membership,

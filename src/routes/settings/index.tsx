@@ -4,6 +4,7 @@ import { useQuery, useMutation } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../convex/_generated/api";
 import { Loading } from "../../shared/components/Loading";
+import { PasswordConfirmDialog } from "../../shared/components/PasswordConfirmDialog";
 
 export const Route = createFileRoute("/settings/")({
   component: SettingsProfilePage,
@@ -16,9 +17,12 @@ function SettingsProfilePage() {
   const canDeleteAccount = useQuery(api.users.canDeleteAccount);
   const deleteAccount = useMutation(api.users.deleteAccount);
 
+  // PasswordConfirmDialog is the first gate before the destructive "type DELETE" step.
+  // Note: the password cannot be verified server-side with Convex Auth — this is
+  // a conscious UX friction layer that makes users slow down before an irreversible action.
+  const [showPasswordGate, setShowPasswordGate] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [deletePassword, setDeletePassword] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,16 +39,11 @@ function SettingsProfilePage() {
       return;
     }
 
-    if (!deletePassword.trim()) {
-      setError("Please enter your password");
-      return;
-    }
-
     setIsDeleting(true);
     setError(null);
 
     try {
-      await deleteAccount({ confirmPassword: deletePassword });
+      await deleteAccount({});
       await signOut();
       navigate({ to: "/login" });
     } catch (err) {
@@ -171,9 +170,22 @@ function SettingsProfilePage() {
           </ul>
         </div>
 
-        {!showDeleteConfirm ? (
+        {/* Step 1: password gate dialog */}
+        <PasswordConfirmDialog
+          isOpen={showPasswordGate}
+          title="Confirm before deleting"
+          description="Enter your password to proceed to the deletion confirmation step. This does not delete your account yet."
+          onClose={() => setShowPasswordGate(false)}
+          onConfirm={async () => {
+            // Password is used as UX friction only — not verified server-side.
+            // After this gate the user must also type DELETE in the next step.
+            setShowDeleteConfirm(true);
+          }}
+        />
+
+        {!showPasswordGate && !showDeleteConfirm ? (
           <button
-            onClick={() => setShowDeleteConfirm(true)}
+            onClick={() => setShowPasswordGate(true)}
             disabled={!canDeleteAccount?.canDelete}
             style={{
               backgroundColor: "#dc2626",
@@ -183,7 +195,7 @@ function SettingsProfilePage() {
           >
             Delete My Account
           </button>
-        ) : (
+        ) : showDeleteConfirm ? (
           <div
             style={{
               padding: "1.5rem",
@@ -219,29 +231,6 @@ function SettingsProfilePage() {
 
             <div style={{ marginBottom: "1rem" }}>
               <label
-                htmlFor="delete-password"
-                style={{
-                  display: "block",
-                  marginBottom: "0.5rem",
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                }}
-              >
-                Enter your password to confirm:
-              </label>
-              <input
-                id="delete-password"
-                type="password"
-                value={deletePassword}
-                onChange={(e) => setDeletePassword(e.target.value)}
-                placeholder="Password"
-                style={{ width: "100%" }}
-                disabled={isDeleting}
-              />
-            </div>
-
-            <div style={{ marginBottom: "1rem" }}>
-              <label
                 htmlFor="delete-confirm"
                 style={{
                   display: "block",
@@ -266,12 +255,11 @@ function SettingsProfilePage() {
             <div style={{ display: "flex", gap: "0.5rem" }}>
               <button
                 onClick={handleDeleteAccount}
-                disabled={deleteConfirmText !== "DELETE" || !deletePassword.trim() || isDeleting}
+                disabled={deleteConfirmText !== "DELETE" || isDeleting}
                 style={{
                   backgroundColor: "#dc2626",
                   color: "#fff",
-                  opacity:
-                    deleteConfirmText !== "DELETE" || !deletePassword.trim() || isDeleting ? 0.5 : 1,
+                  opacity: deleteConfirmText !== "DELETE" || isDeleting ? 0.5 : 1,
                 }}
               >
                 {isDeleting ? "Deleting..." : "Permanently Delete Account"}
@@ -279,8 +267,8 @@ function SettingsProfilePage() {
               <button
                 onClick={() => {
                   setShowDeleteConfirm(false);
+                  setShowPasswordGate(false);
                   setDeleteConfirmText("");
-                  setDeletePassword("");
                   setError(null);
                 }}
                 disabled={isDeleting}

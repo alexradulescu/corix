@@ -3,9 +3,17 @@ import { useState, FormEvent, ReactNode } from "react";
 interface PasswordConfirmDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Called with the entered text when the user submits.
+   * Note: password verification cannot be done server-side with Convex Auth.
+   * This dialog acts as a conscious UX friction gate.
+   * For actual security, pair it with a follow-up server-side check that
+   * uses a verifiable credential (e.g., a TOTP code or a re-auth flow).
+   */
   onConfirm: (password: string) => Promise<void>;
   title?: string;
   description?: string;
+  /** Optional extra content rendered inside the dialog above the input */
   children?: ReactNode;
 }
 
@@ -36,11 +44,7 @@ export function PasswordConfirmDialog({
       setPassword("");
       onClose();
     } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Confirmation failed");
-      }
+      setError(err instanceof Error ? err.message : "Confirmation failed");
     } finally {
       setIsSubmitting(false);
     }
@@ -56,6 +60,9 @@ export function PasswordConfirmDialog({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pwd-dialog-title"
       style={{
         position: "fixed",
         inset: 0,
@@ -78,20 +85,28 @@ export function PasswordConfirmDialog({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ marginBottom: "0.5rem" }}>{title}</h2>
+        <h2 id="pwd-dialog-title" style={{ marginBottom: "0.5rem" }}>
+          {title}
+        </h2>
         <p style={{ color: "#666", marginBottom: "1.5rem", fontSize: "0.875rem" }}>
           {description}
         </p>
 
         {children}
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+        >
           <div>
-            <label htmlFor="confirm-password" style={{ display: "block", marginBottom: "0.25rem" }}>
+            <label
+              htmlFor="pwd-confirm-input"
+              style={{ display: "block", marginBottom: "0.25rem" }}
+            >
               Current Password
             </label>
             <input
-              id="confirm-password"
+              id="pwd-confirm-input"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -102,13 +117,15 @@ export function PasswordConfirmDialog({
           </div>
 
           {error && (
-            <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>
-              {error}
-            </div>
+            <div style={{ color: "#dc2626", fontSize: "0.875rem" }}>{error}</div>
           )}
 
           <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-            <button type="button" onClick={handleClose} style={{ backgroundColor: "#e5e5e5", color: "#333" }}>
+            <button
+              type="button"
+              onClick={handleClose}
+              style={{ backgroundColor: "#e5e5e5", color: "#333" }}
+            >
               Cancel
             </button>
             <button type="submit" disabled={isSubmitting}>

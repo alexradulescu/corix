@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Header } from "./Header";
+import styles from "./shared.module.css";
 
 interface LayoutProps {
   children: ReactNode;
@@ -7,15 +8,9 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div className={styles.layout}>
       <Header />
-      <main style={{ flex: 1 }}>{children}</main>
+      <main className={styles.main}>{children}</main>
     </div>
   );
 }
